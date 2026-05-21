@@ -215,7 +215,6 @@ export function SquarePanel({ projectId, menuSkus }: Props) {
                 padding: "6px 10px",
                 fontSize: 12,
                 fontWeight: 600,
-                border: "none",
                 background: tab === t ? "#fff" : "transparent",
                 borderRadius: 6,
                 cursor: "pointer",
