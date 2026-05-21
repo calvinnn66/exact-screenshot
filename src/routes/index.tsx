@@ -1763,10 +1763,9 @@ function Settings() {
         </Card>
       </Grid>
 
-      <Grid cols="1fr 1fr" gap={16} style={{ marginBottom: 16 }}>
-        <LocationsAdmin/>
-        <StationsAdmin/>
-      </Grid>
+      <div style={{ marginBottom: 16 }}><LocationsAdmin/></div>
+      <div style={{ marginBottom: 16 }}><ManageStations/></div>
+
       <Grid cols="1fr 1fr" gap={16} style={{ marginBottom: 16 }}>
         <CategoriesAdmin/>
         <VendorsAdmin/>
