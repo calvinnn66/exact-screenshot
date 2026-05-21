@@ -830,38 +830,63 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     <div style={containerStyle}>
       <Sidebar tab={tab} setTab={(t: string) => { setTab(t); setSidebarOpen(false); }} open={sidebarOpen} setOpen={setSidebarOpen} isMobile={isMobile} brand={app.brand}/>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ height: 56, borderBottom: `1px solid ${ui.line}`, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", position: "sticky", top: 0, zIndex: 30 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2 }}>
-                <Icon.menu/>
-              </button>
-            )}
-            <button onClick={app.exitProject} title="Back to projects" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, height: 32, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: ui.ink2, fontSize: 12, fontWeight: 600 }}>
-              <span style={{ fontSize: 14 }}>←</span> Projects
-            </button>
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: ui.ink, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{app.projectName}</div>
-              <div style={{ fontSize: 10, color: ui.faint, ...ui.mono, letterSpacing: 0.4 }}>PROJECT</div>
+        {isMobile ? (
+          <header style={{ borderBottom: `1px solid ${ui.line}`, background: "#fff", position: "sticky", top: 0, zIndex: 30 }}>
+            <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, flexShrink: 0 }}>
+                  <Icon.menu/>
+                </button>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: ui.ink, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{app.projectName}</div>
+                  <button onClick={app.exitProject} style={{ background: "none", border: "none", padding: 0, fontSize: 10, color: ui.muted, ...ui.mono, letterSpacing: 0.4, textAlign: "left", cursor: "pointer" }}>← ALL PROJECTS</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <button onClick={() => setTab("scanner")} aria-label="Scan" style={{ background: ui.ink, color: "#fff", border: "none", borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer" }}>{Icon.camera(16)}</button>
+                <button aria-label="Alerts" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
+                  <Icon.bell/>
+                  {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
+                </button>
+              </div>
             </div>
-            <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, fontWeight: 600 }}>
-              {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
-          </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px 10px", overflowX: "auto" }}>
+              <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, padding: "6px 10px", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
+              <span style={{ ...ui.mono, fontSize: 11, color: ui.muted, marginLeft: "auto", flexShrink: 0 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          </header>
+        ) : (
+          <header style={{ height: 56, borderBottom: `1px solid ${ui.line}`, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", position: "sticky", top: 0, zIndex: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <button onClick={app.exitProject} title="Back to projects" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, height: 32, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: ui.ink2, fontSize: 12, fontWeight: 600 }}>
+                <span style={{ fontSize: 14 }}>←</span> Projects
+              </button>
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: ui.ink, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{app.projectName}</div>
+                <div style={{ fontSize: 10, color: ui.faint, ...ui.mono, letterSpacing: 0.4 }}>PROJECT</div>
+              </div>
+              <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, fontWeight: 600 }}>
+                {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
+            </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Btn size="sm" variant="primary" onClick={() => setTab("scanner")} style={{ display: isMobile ? "none" : "inline-flex" }}>{Icon.camera(14)} Scan</Btn>
-            <div style={{ ...ui.mono, fontSize: 12, color: ui.muted, display: isMobile ? "none" : "block" }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-            <button style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
-              <Icon.bell/>
-              {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
-            </button>
-            <div style={{ width: 32, height: 32, borderRadius: 999, background: "#E5E7EB", color: ui.ink, display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12 }}>{app.brand[0]}</div>
-          </div>
-        </header>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Btn size="sm" variant="primary" onClick={() => setTab("scanner")}>{Icon.camera(14)} Scan</Btn>
+              <div style={{ ...ui.mono, fontSize: 12, color: ui.muted }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              <button style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
+                <Icon.bell/>
+                {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
+              </button>
+              <div style={{ width: 32, height: 32, borderRadius: 999, background: "#E5E7EB", color: ui.ink, display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12 }}>{app.brand[0]}</div>
+            </div>
+          </header>
+        )}
 
-        <main style={{ flex: 1, padding: isMobile ? 14 : 24, overflow: "auto" }}>
+        <main style={{ flex: 1, padding: isMobile ? 14 : 24, paddingBottom: isMobile ? 80 : 24, overflow: "auto" }}>
           {tab === "dashboard"    && <Dashboard stats={stats} setTab={setTab}/>}
           {tab === "scanner"      && <Scanner/>}
           {tab === "stations"     && <Stations/>}
@@ -875,6 +900,8 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive}/>}
           {tab === "settings"     && <Settings/>}
         </main>
+
+        {isMobile && <MobileTabBar tab={tab} setTab={setTab}/>}
       </div>
     </div>
   );
