@@ -193,7 +193,7 @@ export const updateCatalogMap = createServerFn({ method: "POST" })
     }).parse(i)
   )
   .handler(async ({ data }) => {
-    const patch: Record<string, unknown> = { menu_sku: data.menuSku };
+    const patch: { menu_sku: string | null; ignored?: boolean } = { menu_sku: data.menuSku };
     if (typeof data.ignored === "boolean") patch.ignored = data.ignored;
     const { error } = await supabaseAdmin
       .from("square_catalog_map")
