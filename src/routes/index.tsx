@@ -160,7 +160,7 @@ const Icon = {
   menu: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
 };
 
-const NAV: { id: string; label: string; svg: JSX.Element }[] = [
+const NAV: { id: string; label: string; svg: React.ReactNode }[] = [
   { id: "dashboard",   label: "Dashboard",         svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.6"/><rect x="13" y="3" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6"/><rect x="13" y="11" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.6"/><rect x="3" y="15" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.6"/></svg> },
   { id: "stations",    label: "Stations",          svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 10h16M4 14h16M6 6h12v12H6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg> },
   { id: "inventory",   label: "Full Inventory",    svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg> },
