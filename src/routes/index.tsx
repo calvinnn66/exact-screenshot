@@ -580,25 +580,27 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
               {filtered.map(p => {
                 const crit = p.state.items.filter(i => i.current <= i.par * 0.4).length;
                 return (
-                  <div key={p.id} style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, boxShadow: ui.shadow, padding: 18, display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 14 }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>{p.name}</div>
-                        {p.type && <Pill tone="neutral">{p.type}</Pill>}
-                        {crit > 0 ? <Pill tone="bad">{crit} critical</Pill> : <Pill tone="ok">healthy</Pill>}
+                  <div key={p.id} style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, boxShadow: ui.shadow, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>{p.name}</div>
+                          {p.type && <Pill tone="neutral">{p.type}</Pill>}
+                          {crit > 0 ? <Pill tone="bad">{crit} critical</Pill> : <Pill tone="ok">healthy</Pill>}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12, color: ui.muted }}>
+                          <span>{p.state.locations.length} loc</span>
+                          <span>{p.state.items.length} items</span>
+                          <span>{p.state.stationModules.filter(s => !s.hidden).length} stations</span>
+                          <span style={{ ...ui.mono, fontSize: 11 }}>{timeAgo(p.lastOpened)}</span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: ui.muted }}>
-                        <span>{p.state.locations.length} location{p.state.locations.length === 1 ? "" : "s"}</span>
-                        <span>{p.state.items.length} items</span>
-                        <span>{p.state.stationModules.filter(s => !s.hidden).length} stations</span>
-                        <span style={{ ...ui.mono, fontSize: 11 }}>opened {timeAgo(p.lastOpened)}</span>
-                      </div>
+                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
                     </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <Btn variant="primary" onClick={() => onOpen(p.id)}>Open</Btn>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <Btn variant="primary" onClick={() => onOpen(p.id)} style={{ flex: "1 1 120px", justifyContent: "center" }}>Open</Btn>
                       <Btn size="sm" variant="ghost" onClick={() => rename(p)}>Rename</Btn>
                       <Btn size="sm" variant="ghost" onClick={() => duplicate(p)}>Duplicate</Btn>
-                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
                     </div>
                   </div>
                 );
