@@ -349,7 +349,7 @@ function KitchenIntel() {
   return (
     <div style={containerStyle}>
       {/* SIDEBAR */}
-      <Sidebar tab={tab} setTab={(t) => { setTab(t); setSidebarOpen(false); }} open={sidebarOpen} setOpen={setSidebarOpen} isMobile={isMobile} />
+      <Sidebar tab={tab} setTab={(t: string) => { setTab(t); setSidebarOpen(false); }} open={sidebarOpen} setOpen={setSidebarOpen} isMobile={isMobile} />
 
       {/* MAIN */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
