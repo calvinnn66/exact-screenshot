@@ -747,6 +747,64 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     return () => clearInterval(t);
   }, [posLive, app.menu]);
 
+  // Real POS feed (Toast + Square) → recipe-driven deduction + sales feed
+  const livePosFn = useServerFn(getLivePosFeed);
+  const processedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!posLive) return;
+    const projectId = "aa475a88-be51-4f31-9bb2-d0266a47d1be";
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res: any = await livePosFn({ data: { projectId, limit: 50 } });
+        if (cancelled || !res?.ok || !res.rows?.length) return;
+        const hour = new Date().getHours();
+        const newSalesRows: SalesRow[] = [];
+        const inventoryHits: { menuId: string; qty: number }[] = [];
+
+        // Process oldest → newest so order is intuitive in the feed
+        for (const order of [...res.rows].reverse()) {
+          if (processedRef.current.has(order.external_id)) continue;
+          processedRef.current.add(order.external_id);
+          for (const item of order.items as any[]) {
+            if (!item.menuSku || item.ignored) continue;
+            const menu = app.menu.find((m: any) => m.id === item.menuSku);
+            if (!menu) continue;
+            const qty = Number(item.quantity) || 1;
+            newSalesRows.push({ menuId: menu.id, hour, qty });
+            inventoryHits.push({ menuId: menu.id, qty });
+          }
+        }
+
+        if (inventoryHits.length > 0) {
+          app.setItems((prev: Item[]) => {
+            const next = prev.map((p) => ({ ...p }));
+            const byId: Record<string, Item> = Object.fromEntries(next.map((n) => [n.id, n]));
+            for (const hit of inventoryHits) {
+              const m = app.menu.find((mm: any) => mm.id === hit.menuId);
+              if (!m) continue;
+              for (const r of m.recipe) {
+                const it = byId[r.itemId];
+                if (it) it.current = Math.max(0, +(it.current - r.qty * hit.qty).toFixed(2));
+              }
+            }
+            return next;
+          });
+        }
+        if (newSalesRows.length > 0) {
+          app.setSales((s: SalesRow[]) => [...newSalesRows, ...s].slice(0, 200));
+        }
+      } catch (err) {
+        // Silent — webhook + DB are source of truth, next poll will retry
+        console.warn("live pos poll failed", err);
+      }
+    };
+    tick();
+    const t = setInterval(tick, 8000);
+    return () => { cancelled = true; clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posLive, app.menu]);
+
   const stats = useMemo(() => {
     const total = app.items.length;
     const critical = app.items.filter(i => i.current <= i.par * 0.4).length;
