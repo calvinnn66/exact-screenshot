@@ -14,7 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      pos_orders: {
+        Row: {
+          created_at: string
+          currency: string
+          external_id: string
+          id: string
+          items: Json
+          location_id: string | null
+          merchant_id: string | null
+          ordered_at: string
+          project_id: string
+          source: string
+          total_cents: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          external_id: string
+          id?: string
+          items?: Json
+          location_id?: string | null
+          merchant_id?: string | null
+          ordered_at?: string
+          project_id: string
+          source?: string
+          total_cents?: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          external_id?: string
+          id?: string
+          items?: Json
+          location_id?: string | null
+          merchant_id?: string | null
+          ordered_at?: string
+          project_id?: string
+          source?: string
+          total_cents?: number
+        }
+        Relationships: []
+      }
+      square_catalog_map: {
+        Row: {
+          created_at: string
+          id: string
+          ignored: boolean
+          menu_sku: string | null
+          merchant_id: string
+          project_id: string
+          square_name: string
+          square_object_id: string
+          square_variation_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ignored?: boolean
+          menu_sku?: string | null
+          merchant_id: string
+          project_id: string
+          square_name: string
+          square_object_id: string
+          square_variation_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ignored?: boolean
+          menu_sku?: string | null
+          merchant_id?: string
+          project_id?: string
+          square_name?: string
+          square_object_id?: string
+          square_variation_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      square_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          environment: string
+          expires_at: string
+          id: string
+          location_id: string | null
+          merchant_id: string
+          project_id: string
+          refresh_token: string
+          scopes: string[]
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          environment?: string
+          expires_at: string
+          id?: string
+          location_id?: string | null
+          merchant_id: string
+          project_id: string
+          refresh_token: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          environment?: string
+          expires_at?: string
+          id?: string
+          location_id?: string | null
+          merchant_id?: string
+          project_id?: string
+          refresh_token?: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      square_webhook_events: {
+        Row: {
+          error: string | null
+          event_id: string
+          id: string
+          location_id: string | null
+          merchant_id: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          type: string
+        }
+        Insert: {
+          error?: string | null
+          event_id: string
+          id?: string
+          location_id?: string | null
+          merchant_id?: string | null
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          type: string
+        }
+        Update: {
+          error?: string | null
+          event_id?: string
+          id?: string
+          location_id?: string | null
+          merchant_id?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
