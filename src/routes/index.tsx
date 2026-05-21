@@ -1688,18 +1688,27 @@ function Deliveries() {
 
 function Integrations({ integrations, setIntegrations, posLive, setPosLive }: any) {
   const { menu } = useApp();
+  const projectId = "aa475a88-be51-4f31-9bb2-d0266a47d1be";
+  const menuSkus = menu.map((m: any) => ({ sku: m.id, name: m.name }));
   return (
     <div>
       <PageHeader title="Integrations" subtitle="Connect POS, accounting, and supplier systems"/>
-      <Card title="POS Sync Status" action={<Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} {posLive ? "Live" : "Paused"}</Pill>} style={{ marginBottom: 16 }}>
+
+      <Grid cols="1fr 1fr" gap={16} style={{ marginBottom: 16 }}>
+        <ToastPanel projectId={projectId} menuSkus={menuSkus} />
+        <SquarePanel projectId={projectId} menuSkus={menuSkus} />
+      </Grid>
+
+      <Card title="POS Sync Status" action={<Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} {posLive ? "Simulator Live" : "Simulator Paused"}</Pill>} style={{ marginBottom: 16 }}>
         <Grid cols="repeat(auto-fit, minmax(160px, 1fr))" gap={10}>
-          <div><div style={kvLabel}>Active POS</div><div style={kvValue}>Toast</div></div>
+          <div><div style={kvLabel}>Simulator</div><div style={kvValue}>Demo POS</div></div>
           <div><div style={kvLabel}>Last sync</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>8s ago</div></div>
           <div><div style={kvLabel}>Records / day</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>1,284</div></div>
           <div><div style={kvLabel}>Webhook latency</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>p95 · 142ms</div></div>
           <div style={{ display: "flex", alignItems: "flex-end" }}><Btn size="sm" onClick={() => setPosLive((v: boolean) => !v)}>{posLive ? "Pause" : "Resume"}</Btn></div>
         </Grid>
       </Card>
+
 
       {["POS", "Accounting", "Supplier"].map(cat => {
         const list = integrations.filter((i: Integration) => i.category === cat);
