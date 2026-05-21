@@ -53,16 +53,65 @@ type Integration = {
   id: string; name: string; category: "POS" | "Accounting" | "Reporting" | "Supplier";
   status: "connected" | "available" | "error"; lastSync?: string; records?: number;
 };
+type StationType =
+  | "line" | "grill" | "fry" | "flat-top" | "cold" | "prep" | "pantry" | "expo"
+  | "pizza" | "salad" | "dessert" | "bar" | "bakery" | "dish" | "storage" | "custom";
+type StationModule = {
+  id: string;
+  name: string;          // unique within project (e.g. "Flat Top", "Flat Top 2")
+  templateId?: string;   // reference to template (optional)
+  type: StationType;
+  hidden: boolean;
+  order: number;
+  notes?: string;
+};
+
+/* ============================================================
+   STATION TEMPLATES (searchable module library)
+   ============================================================ */
+type StationTemplate = { id: string; name: string; type: StationType; aliases?: string[] };
+const STATION_TEMPLATES: StationTemplate[] = [
+  { id: "flat-top",      name: "Flat Top",        type: "flat-top", aliases: ["griddle", "plancha"] },
+  { id: "fry",           name: "Fry Station",     type: "fry",      aliases: ["fryer", "fryers"] },
+  { id: "grill",         name: "Grill",           type: "grill",    aliases: ["char", "char-grill", "broiler"] },
+  { id: "cold-line",     name: "Cold Line",       type: "cold",     aliases: ["garde-manger", "cold"] },
+  { id: "hot-line",      name: "Hot Line",        type: "line",     aliases: ["saute", "sauté", "hot"] },
+  { id: "line-1",        name: "Line 1",          type: "line" },
+  { id: "line-2",        name: "Line 2",          type: "line" },
+  { id: "prep",          name: "Prep Station",    type: "prep",     aliases: ["prep"] },
+  { id: "pantry",        name: "Pantry",          type: "pantry" },
+  { id: "expo",          name: "Expo",            type: "expo",     aliases: ["pass", "expediter"] },
+  { id: "pizza",         name: "Pizza Station",   type: "pizza" },
+  { id: "salad",         name: "Salad Station",   type: "salad" },
+  { id: "dessert",       name: "Dessert Station", type: "dessert",  aliases: ["pastry"] },
+  { id: "bar",           name: "Bar",             type: "bar" },
+  { id: "bakery",        name: "Bakery",          type: "bakery" },
+  { id: "dish",          name: "Dish",            type: "dish",     aliases: ["dishpit", "dish pit"] },
+  { id: "storage",       name: "Storage",         type: "storage" },
+  { id: "walk-in-cooler",name: "Walk-In Cooler",  type: "storage",  aliases: ["walkin", "cooler"] },
+  { id: "walk-in-freezer",name:"Walk-In Freezer", type: "storage",  aliases: ["walkin", "freezer"] },
+  { id: "dry-storage",   name: "Dry Storage",     type: "storage",  aliases: ["dry"] },
+];
 
 /* ============================================================
    SEED DATA (first-run only, persisted to localStorage)
    ============================================================ */
-const DEFAULT_STATIONS = ["Flat Top", "Fryer", "Sauté", "Char Grill", "Cold Line"];
+const DEFAULT_STATION_NAMES = ["Flat Top", "Fry Station", "Hot Line", "Grill", "Cold Line"];
+function buildDefaultStationModules(): StationModule[] {
+  return DEFAULT_STATION_NAMES.map((n, i) => {
+    const tpl = STATION_TEMPLATES.find(t => t.name === n);
+    return {
+      id: uid("stn"), name: n, templateId: tpl?.id,
+      type: tpl?.type ?? "custom", hidden: false, order: i,
+    };
+  });
+}
 const DEFAULT_CATEGORIES = ["Produce", "Protein", "Dairy", "Bakery", "Pantry", "Frozen", "Beverage"];
 const DEFAULT_VENDORS: Vendor[] = [
   { id: "v_sysco", name: "Sysco", category: "Broadline" },
   { id: "v_usf",   name: "US Foods", category: "Broadline" },
 ];
+
 
 const seedItems = (): Item[] => {
   const base: Omit<Item, "usage" | "current">[] = [
