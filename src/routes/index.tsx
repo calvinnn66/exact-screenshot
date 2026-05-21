@@ -435,7 +435,7 @@ function KitchenIntel() {
 
   useEffect(() => { if (hydrated) saveProjects(store); }, [hydrated, store]);
 
-  const startApp = () => setStore(s => ({ ...s, sawWelcome: true })) || setView("picker");
+  const startApp = () => { setStore(s => ({ ...s, sawWelcome: true })); setView("picker"); };
   const openProject = (id: string) => {
     setStore(s => ({
       ...s, activeProjectId: id,
