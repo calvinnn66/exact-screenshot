@@ -549,7 +549,7 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "40px 24px" }}>
+    <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "24px 14px 40px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: ui.ink, color: "#fff", display: "grid", placeItems: "center", fontWeight: 800 }}>K</div>
