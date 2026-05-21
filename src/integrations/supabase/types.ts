@@ -173,6 +173,120 @@ export type Database = {
         }
         Relationships: []
       }
+      toast_connections: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          client_secret: string
+          created_at: string
+          environment: string
+          expires_at: string | null
+          id: string
+          management_group_guid: string | null
+          project_id: string
+          restaurant_guid: string
+          scopes: string[]
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          client_secret: string
+          created_at?: string
+          environment?: string
+          expires_at?: string | null
+          id?: string
+          management_group_guid?: string | null
+          project_id: string
+          restaurant_guid: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string
+          environment?: string
+          expires_at?: string | null
+          id?: string
+          management_group_guid?: string | null
+          project_id?: string
+          restaurant_guid?: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      toast_menu_map: {
+        Row: {
+          created_at: string
+          id: string
+          ignored: boolean
+          menu_sku: string | null
+          project_id: string
+          restaurant_guid: string
+          toast_item_guid: string
+          toast_item_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ignored?: boolean
+          menu_sku?: string | null
+          project_id: string
+          restaurant_guid: string
+          toast_item_guid: string
+          toast_item_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ignored?: boolean
+          menu_sku?: string | null
+          project_id?: string
+          restaurant_guid?: string
+          toast_item_guid?: string
+          toast_item_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      toast_webhook_events: {
+        Row: {
+          error: string | null
+          event_id: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          restaurant_guid: string | null
+          type: string
+        }
+        Insert: {
+          error?: string | null
+          event_id: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          restaurant_guid?: string | null
+          type: string
+        }
+        Update: {
+          error?: string | null
+          event_id?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          restaurant_guid?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

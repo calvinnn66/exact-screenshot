@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSquareCallbackRouteImport } from './routes/api/square/callback'
+import { Route as ApiPublicToastWebhookRouteImport } from './routes/api/public/toast/webhook'
 import { Route as ApiPublicSquareWebhookRouteImport } from './routes/api/public/square/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ApiSquareCallbackRoute = ApiSquareCallbackRouteImport.update({
   path: '/api/square/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicToastWebhookRoute = ApiPublicToastWebhookRouteImport.update({
+  id: '/api/public/toast/webhook',
+  path: '/api/public/toast/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSquareWebhookRoute = ApiPublicSquareWebhookRouteImport.update({
   id: '/api/public/square/webhook',
   path: '/api/public/square/webhook',
@@ -33,30 +39,47 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/square/callback': typeof ApiSquareCallbackRoute
   '/api/public/square/webhook': typeof ApiPublicSquareWebhookRoute
+  '/api/public/toast/webhook': typeof ApiPublicToastWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/square/callback': typeof ApiSquareCallbackRoute
   '/api/public/square/webhook': typeof ApiPublicSquareWebhookRoute
+  '/api/public/toast/webhook': typeof ApiPublicToastWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/square/callback': typeof ApiSquareCallbackRoute
   '/api/public/square/webhook': typeof ApiPublicSquareWebhookRoute
+  '/api/public/toast/webhook': typeof ApiPublicToastWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/square/callback' | '/api/public/square/webhook'
+  fullPaths:
+    | '/'
+    | '/api/square/callback'
+    | '/api/public/square/webhook'
+    | '/api/public/toast/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/square/callback' | '/api/public/square/webhook'
-  id: '__root__' | '/' | '/api/square/callback' | '/api/public/square/webhook'
+  to:
+    | '/'
+    | '/api/square/callback'
+    | '/api/public/square/webhook'
+    | '/api/public/toast/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/square/callback'
+    | '/api/public/square/webhook'
+    | '/api/public/toast/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiSquareCallbackRoute: typeof ApiSquareCallbackRoute
   ApiPublicSquareWebhookRoute: typeof ApiPublicSquareWebhookRoute
+  ApiPublicToastWebhookRoute: typeof ApiPublicToastWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,6 +98,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSquareCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/toast/webhook': {
+      id: '/api/public/toast/webhook'
+      path: '/api/public/toast/webhook'
+      fullPath: '/api/public/toast/webhook'
+      preLoaderRoute: typeof ApiPublicToastWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/square/webhook': {
       id: '/api/public/square/webhook'
       path: '/api/public/square/webhook'
@@ -89,6 +119,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiSquareCallbackRoute: ApiSquareCallbackRoute,
   ApiPublicSquareWebhookRoute: ApiPublicSquareWebhookRoute,
+  ApiPublicToastWebhookRoute: ApiPublicToastWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
