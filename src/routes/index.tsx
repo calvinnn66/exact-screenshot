@@ -993,6 +993,44 @@ function Sidebar({ tab, setTab, open, setOpen, isMobile, brand }: any) {
   );
 }
 
+/* ---------- Mobile bottom tab bar ---------- */
+function MobileTabBar({ tab, setTab }: { tab: string; setTab: (t: string) => void }) {
+  const items = [
+    { id: "dashboard", label: "Home",      svg: NAV.find(n => n.id === "dashboard")!.svg },
+    { id: "inventory", label: "Inventory", svg: NAV.find(n => n.id === "inventory")!.svg },
+    { id: "scanner",   label: "Scan",      svg: Icon.camera(20), primary: true },
+    { id: "stations",  label: "Stations",  svg: NAV.find(n => n.id === "stations")!.svg },
+    { id: "reports",   label: "Reports",   svg: NAV.find(n => n.id === "reports")!.svg },
+  ];
+  return (
+    <nav style={{
+      position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40,
+      background: "#fff", borderTop: `1px solid ${ui.line}`,
+      display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      boxShadow: "0 -2px 12px rgba(16,24,40,.04)",
+    }}>
+      {items.map(it => {
+        const active = tab === it.id;
+        if (it.primary) {
+          return (
+            <button key={it.id} onClick={() => setTab(it.id)} style={{ background: "none", border: "none", padding: "8px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
+              <span style={{ width: 46, height: 46, borderRadius: 999, background: ui.ink, color: "#fff", display: "grid", placeItems: "center", marginTop: -18, boxShadow: ui.shadowMd }}>{it.svg}</span>
+              <span style={{ fontSize: 10, color: ui.ink, fontWeight: 600 }}>{it.label}</span>
+            </button>
+          );
+        }
+        return (
+          <button key={it.id} onClick={() => setTab(it.id)} style={{ background: "none", border: "none", padding: "10px 0 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? ui.ink : ui.muted }}>
+            <span style={{ opacity: active ? 1 : 0.75 }}>{it.svg}</span>
+            <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{it.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 /* ============================================================
    DASHBOARD
    ============================================================ */
