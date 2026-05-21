@@ -1813,25 +1813,194 @@ function LocationsAdmin() {
   );
 }
 
-function StationsAdmin() {
-  const { stations, setStations } = useApp();
-  const [name, setName] = useState("");
-  const add = () => { const v = name.trim(); if (!v || stations.includes(v)) return; setStations(prev => [...prev, v]); setName(""); };
+/* ============================================================
+   MANAGE STATIONS — modular station system
+   ============================================================ */
+function ManageStations() {
+  const app = useApp();
+  const { stationModules, setStationModules, items, setItems, menu, setMenu } = app;
+  const [q, setQ] = useState("");
+  const [showLib, setShowLib] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  const sorted = [...stationModules].sort((a, b) => a.order - b.order);
+  const visible = sorted.filter(s => !s.hidden);
+  const hidden = sorted.filter(s => s.hidden);
+
+  // unique name suffix: "Flat Top" → "Flat Top 2" if exists
+  const uniqueName = (base: string): string => {
+    const existing = new Set(stationModules.map(s => s.name.toLowerCase()));
+    if (!existing.has(base.toLowerCase())) return base;
+    let i = 2;
+    while (existing.has(`${base} ${i}`.toLowerCase())) i++;
+    return `${base} ${i}`;
+  };
+
+  const addFromTemplate = (tpl: StationTemplate) => {
+    const name = uniqueName(tpl.name);
+    const order = Math.max(0, ...stationModules.map(s => s.order)) + 1;
+    setStationModules(prev => [...prev, { id: uid("stn"), name, templateId: tpl.id, type: tpl.type, hidden: false, order }]);
+    setShowLib(false); setQ("");
+  };
+  const addCustom = () => {
+    const n = customName.trim();
+    if (!n) return;
+    const name = uniqueName(n);
+    const order = Math.max(0, ...stationModules.map(s => s.order)) + 1;
+    setStationModules(prev => [...prev, { id: uid("stn"), name, type: "custom", hidden: false, order }]);
+    setCustomName("");
+  };
+  const duplicate = (s: StationModule) => {
+    const name = uniqueName(s.name);
+    const order = Math.max(0, ...stationModules.map(x => x.order)) + 1;
+    setStationModules(prev => [...prev, { ...s, id: uid("stn"), name, hidden: false, order }]);
+  };
+  const renameStation = (s: StationModule) => {
+    const next = window.prompt("Rename station", s.name);
+    if (!next || !next.trim() || next.trim() === s.name) return;
+    const finalName = uniqueName(next.trim());
+    const old = s.name;
+    setStationModules(prev => prev.map(x => x.id === s.id ? { ...x, name: finalName } : x));
+    // cascade
+    setItems(prev => prev.map(i => i.station === old ? { ...i, station: finalName } : i));
+    setMenu(prev => prev.map(m => m.station === old ? { ...m, station: finalName } : m));
+  };
+  const toggleHide = (s: StationModule) =>
+    setStationModules(prev => prev.map(x => x.id === s.id ? { ...x, hidden: !x.hidden } : x));
+  const remove = (s: StationModule) => {
+    const used = items.some(i => i.station === s.name) || menu.some(m => m.station === s.name);
+    if (used && !window.confirm(`"${s.name}" is assigned to inventory/recipes. Remove anyway? Items will be unassigned.`)) return;
+    setStationModules(prev => prev.filter(x => x.id !== s.id));
+  };
+  const move = (id: string, dir: -1 | 1) => {
+    const list = [...sorted];
+    const idx = list.findIndex(x => x.id === id);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= list.length) return;
+    [list[idx], list[swap]] = [list[swap], list[idx]];
+    setStationModules(list.map((x, i) => ({ ...x, order: i })));
+  };
+  const onDrop = (overId: string) => {
+    if (!dragId || dragId === overId) return setDragId(null);
+    const list = [...sorted];
+    const from = list.findIndex(x => x.id === dragId);
+    const to = list.findIndex(x => x.id === overId);
+    if (from < 0 || to < 0) return setDragId(null);
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    setStationModules(list.map((x, i) => ({ ...x, order: i })));
+    setDragId(null);
+  };
+
+  const filteredTemplates = STATION_TEMPLATES.filter(t => {
+    const hay = `${t.name} ${(t.aliases || []).join(" ")}`.toLowerCase();
+    return hay.includes(q.toLowerCase());
+  });
+
   return (
-    <Card title="Stations" subtitle={`${stations.length} stations`}>
-      {stations.map(s => (
-        <div key={s} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${ui.lineSoft}` }}>
-          <span style={{ fontSize: 13 }}>{s}</span>
-          {stations.length > 1 && <Btn size="sm" variant="ghost" onClick={() => setStations(prev => prev.filter(x => x !== s))}><Icon.x/></Btn>}
+    <Card
+      title="Manage Stations"
+      subtitle={`${visible.length} active · ${hidden.length} hidden · drag to reorder`}
+      action={<Btn variant="primary" onClick={() => setShowLib(v => !v)}><Icon.plus/> Add Station Module</Btn>}
+    >
+      {showLib && (
+        <div style={{ marginBottom: 14, padding: 14, background: ui.panel2, border: `1px solid ${ui.lineSoft}`, borderRadius: 10 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: ui.faint }}><Icon.search/></span>
+              <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search modules: flat top, fryer, line, expo…" style={{ ...inputStyle, padding: "8px 12px 8px 32px" }}/>
+            </div>
+            <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="…or custom name" style={{ ...inputStyle, width: 180 }}/>
+            <Btn onClick={addCustom} disabled={!customName.trim()}>Add custom</Btn>
+            <Btn variant="ghost" onClick={() => { setShowLib(false); setQ(""); }}>Close</Btn>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8, maxHeight: 280, overflow: "auto" }}>
+            {filteredTemplates.length === 0 && <div style={{ fontSize: 12, color: ui.muted, padding: 8 }}>No matching templates — add as custom above.</div>}
+            {filteredTemplates.map(t => {
+              const inUse = stationModules.some(s => s.templateId === t.id || s.name === t.name);
+              return (
+                <button key={t.id} onClick={() => addFromTemplate(t)} style={{
+                  textAlign: "left", padding: "10px 12px", borderRadius: 8, border: `1px solid ${ui.line}`,
+                  background: "#fff", cursor: "pointer",
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                  <div style={{ fontSize: 10, color: ui.muted, marginTop: 2, ...ui.mono, letterSpacing: 0.3 }}>
+                    {t.type}{inUse ? " · in use" : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      ))}
-      <div style={{ marginTop: 12, display: "flex", gap: 6 }}>
-        <input placeholder="e.g. Pastry" value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1 }}/>
-        <Btn variant="primary" onClick={add}><Icon.plus/> Add</Btn>
+      )}
+
+      <div>
+        {visible.map(s => {
+          const itemCount = items.filter(i => i.station === s.name).length;
+          const recipeCount = menu.filter(m => m.station === s.name).length;
+          const critical = items.filter(i => i.station === s.name && i.current <= i.par * 0.4).length;
+          return (
+            <div
+              key={s.id}
+              draggable
+              onDragStart={() => setDragId(s.id)}
+              onDragOver={e => { e.preventDefault(); }}
+              onDrop={() => onDrop(s.id)}
+              style={{
+                display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 12, alignItems: "center",
+                padding: "10px 12px", border: `1px solid ${dragId === s.id ? ui.ink : ui.lineSoft}`,
+                borderRadius: 8, marginBottom: 6, background: "#fff", cursor: "grab",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, color: ui.faint }}>
+                <button onClick={() => move(s.id, -1)} style={{ background: "none", border: "none", cursor: "pointer", color: ui.muted, padding: 0 }}><Icon.arrowUp/></button>
+                <button onClick={() => move(s.id, 1)}  style={{ background: "none", border: "none", cursor: "pointer", color: ui.muted, padding: 0 }}><Icon.arrowDown/></button>
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</span>
+                  <Pill tone="neutral">{s.type}</Pill>
+                  {critical > 0 && <Pill tone="bad">{critical} critical</Pill>}
+                </div>
+                <div style={{ fontSize: 11, color: ui.muted, ...ui.mono, letterSpacing: 0.3, marginTop: 3 }}>
+                  {itemCount} item{itemCount === 1 ? "" : "s"} · {recipeCount} recipe{recipeCount === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <Btn size="sm" variant="ghost" onClick={() => renameStation(s)}>Rename</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => duplicate(s)}>Duplicate</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => toggleHide(s)}>Hide</Btn>
+                <Btn size="sm" variant="danger" onClick={() => remove(s)}><Icon.x/></Btn>
+              </div>
+            </div>
+          );
+        })}
+        {visible.length === 0 && (
+          <div style={{ padding: 18, textAlign: "center", fontSize: 13, color: ui.muted, border: `1px dashed ${ui.line}`, borderRadius: 8 }}>
+            No active stations. Click <b style={{ color: ui.ink2 }}>Add Station Module</b> to build your kitchen layout.
+          </div>
+        )}
       </div>
+
+      {hidden.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, color: ui.muted, textTransform: "uppercase", fontWeight: 600, letterSpacing: 0.6, marginBottom: 6 }}>Hidden / inactive ({hidden.length})</div>
+          {hidden.map(s => (
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: `1px solid ${ui.lineSoft}`, borderRadius: 8, marginBottom: 4, background: ui.panel2 }}>
+              <div style={{ fontSize: 13, color: ui.muted }}>{s.name} <span style={{ ...ui.mono, fontSize: 10 }}>· {s.type}</span></div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <Btn size="sm" onClick={() => toggleHide(s)}>Restore</Btn>
+                <Btn size="sm" variant="danger" onClick={() => remove(s)}><Icon.x/></Btn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
+
 
 function CategoriesAdmin() {
   const { categories, setCategories } = useApp();
