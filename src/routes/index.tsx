@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { scanImage } from "@/lib/scan.functions";
 import { ToastPanel } from "@/components/ToastPanel";
 import { SquarePanel } from "@/components/SquarePanel";
+import { getLivePosFeed } from "@/lib/pos.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
