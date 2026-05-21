@@ -1493,6 +1493,7 @@ function ItemRow({ it, setItems }: any) {
 
 function Inventory() {
   const { items, setItems, stations, categories } = useApp();
+  const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [stn, setStn] = useState("all");
@@ -1507,39 +1508,68 @@ function Inventory() {
     <div>
       <PageHeader title="Full Inventory" subtitle={`${items.length} SKUs · live tracking`} actions={<><Btn>Export CSV</Btn><Btn variant="primary">+ Add Item</Btn></>}/>
       <Card pad={0}>
-        <div style={{ display: "flex", gap: 10, padding: 14, borderBottom: `1px solid ${ui.lineSoft}`, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+        <div style={{ display: "flex", gap: 8, padding: isMobile ? 10 : 14, borderBottom: `1px solid ${ui.lineSoft}`, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 100%", minWidth: 0, position: "relative" }}>
             <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: ui.faint }}><Icon.search/></span>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search items…" style={{ ...inputStyle, padding: "8px 12px 8px 32px" }}/>
           </div>
-          <select value={cat} onChange={e => setCat(e.target.value)} style={selectStyle}><option value="all">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select>
-          <select value={stn} onChange={e => setStn(e.target.value)} style={selectStyle}><option value="all">All stations</option>{stations.map(s => <option key={s}>{s}</option>)}</select>
+          <select value={cat} onChange={e => setCat(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 0 }}><option value="all">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select>
+          <select value={stn} onChange={e => setStn(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 0 }}><option value="all">All stations</option>{stations.map(s => <option key={s}>{s}</option>)}</select>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
-            <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
-              <Th>Item</Th><Th>Category</Th><Th>Station</Th><Th>Status</Th><Th align="right">On Hand</Th><Th align="right">Par</Th><Th align="right">Value</Th><Th align="right">7d</Th><Th></Th>
-            </tr></thead>
-            <tbody>
-              {filtered.map(it => {
-                const st = statusOf(it);
-                return (
-                  <tr key={it.id} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{it.name}{it.vendor && <span style={{ display: "block", fontSize: 10, color: ui.muted, fontWeight: 400, marginTop: 2 }}>via {it.vendor}</span>}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.category}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.station}</td>
-                    <td style={{ padding: "12px 16px" }}><Pill tone={st.tone}>{st.label}</Pill></td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12 }}>{it.current} {it.unit}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it.par}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.ink2 }}>${(it.current * it.costPerUnit).toFixed(0)}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}><Spark data={it.usage} w={70} h={20}/></td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}><Btn size="sm" variant="ghost" onClick={() => setItems(prev => prev.filter(x => x.id !== it.id))}><Icon.x/></Btn></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {isMobile ? (
+          <div>
+            {filtered.length === 0 && <div style={{ padding: 24, fontSize: 13, color: ui.muted, textAlign: "center" }}>No items match.</div>}
+            {filtered.map(it => {
+              const st = statusOf(it);
+              const pct = Math.min(100, (it.current / Math.max(it.par, 1)) * 100);
+              const barColor = st.tone === "bad" ? ui.bad : st.tone === "warn" ? ui.warn : ui.ok;
+              return (
+                <div key={it.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${ui.lineSoft}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: ui.ink }}>{it.name}</div>
+                      <div style={{ fontSize: 11, color: ui.muted, marginTop: 2 }}>{it.station} · {it.category}</div>
+                    </div>
+                    <Pill tone={st.tone}>{st.label}</Pill>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                    <div style={{ ...ui.mono, fontSize: 13, fontWeight: 600, color: ui.ink }}>{it.current}<span style={{ color: ui.faint, fontWeight: 400 }}>/{it.par}</span> {it.unit}</div>
+                    <div style={{ flex: 1, height: 4, background: ui.lineSoft, borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", background: barColor }}/>
+                    </div>
+                    <div style={{ ...ui.mono, fontSize: 11, color: ui.muted }}>${(it.current * it.costPerUnit).toFixed(0)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+              <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
+                <Th>Item</Th><Th>Category</Th><Th>Station</Th><Th>Status</Th><Th align="right">On Hand</Th><Th align="right">Par</Th><Th align="right">Value</Th><Th align="right">7d</Th><Th></Th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(it => {
+                  const st = statusOf(it);
+                  return (
+                    <tr key={it.id} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{it.name}{it.vendor && <span style={{ display: "block", fontSize: 10, color: ui.muted, fontWeight: 400, marginTop: 2 }}>via {it.vendor}</span>}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.category}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.station}</td>
+                      <td style={{ padding: "12px 16px" }}><Pill tone={st.tone}>{st.label}</Pill></td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12 }}>{it.current} {it.unit}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it.par}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.ink2 }}>${(it.current * it.costPerUnit).toFixed(0)}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}><Spark data={it.usage} w={70} h={20}/></td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}><Btn size="sm" variant="ghost" onClick={() => setItems(prev => prev.filter(x => x.id !== it.id))}><Icon.x/></Btn></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
