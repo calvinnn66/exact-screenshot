@@ -394,11 +394,12 @@ function statusOf(it: Item): { tone: "ok" | "warn" | "bad"; label: string } {
 }
 const Th = ({ children, align = "left" }: any) => <th style={{ padding: "10px 16px", textAlign: align, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, color: ui.muted }}>{children}</th>;
 function PageHeader({ title, subtitle, actions }: any) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: isMobile ? "stretch" : "flex-end", justifyContent: "space-between", marginBottom: isMobile ? 14 : 18, flexWrap: "wrap", gap: isMobile ? 10 : 12, flexDirection: isMobile ? "column" : "row" }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: ui.ink, letterSpacing: -0.5 }}>{title}</h1>
-        {subtitle && <div style={{ fontSize: 13, color: ui.muted, marginTop: 4 }}>{subtitle}</div>}
+        <h1 style={{ margin: 0, fontSize: isMobile ? 19 : 22, fontWeight: 700, color: ui.ink, letterSpacing: -0.5 }}>{title}</h1>
+        {subtitle && <div style={{ fontSize: isMobile ? 12 : 13, color: ui.muted, marginTop: 4 }}>{subtitle}</div>}
       </div>
       {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
     </div>
@@ -548,7 +549,7 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "40px 24px" }}>
+    <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "24px 14px 40px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: ui.ink, color: "#fff", display: "grid", placeItems: "center", fontWeight: 800 }}>K</div>
@@ -580,25 +581,27 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
               {filtered.map(p => {
                 const crit = p.state.items.filter(i => i.current <= i.par * 0.4).length;
                 return (
-                  <div key={p.id} style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, boxShadow: ui.shadow, padding: 18, display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 14 }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>{p.name}</div>
-                        {p.type && <Pill tone="neutral">{p.type}</Pill>}
-                        {crit > 0 ? <Pill tone="bad">{crit} critical</Pill> : <Pill tone="ok">healthy</Pill>}
+                  <div key={p.id} style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, boxShadow: ui.shadow, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>{p.name}</div>
+                          {p.type && <Pill tone="neutral">{p.type}</Pill>}
+                          {crit > 0 ? <Pill tone="bad">{crit} critical</Pill> : <Pill tone="ok">healthy</Pill>}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12, color: ui.muted }}>
+                          <span>{p.state.locations.length} loc</span>
+                          <span>{p.state.items.length} items</span>
+                          <span>{p.state.stationModules.filter(s => !s.hidden).length} stations</span>
+                          <span style={{ ...ui.mono, fontSize: 11 }}>{timeAgo(p.lastOpened)}</span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: ui.muted }}>
-                        <span>{p.state.locations.length} location{p.state.locations.length === 1 ? "" : "s"}</span>
-                        <span>{p.state.items.length} items</span>
-                        <span>{p.state.stationModules.filter(s => !s.hidden).length} stations</span>
-                        <span style={{ ...ui.mono, fontSize: 11 }}>opened {timeAgo(p.lastOpened)}</span>
-                      </div>
+                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
                     </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <Btn variant="primary" onClick={() => onOpen(p.id)}>Open</Btn>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <Btn variant="primary" onClick={() => onOpen(p.id)} style={{ flex: "1 1 120px", justifyContent: "center" }}>Open</Btn>
                       <Btn size="sm" variant="ghost" onClick={() => rename(p)}>Rename</Btn>
                       <Btn size="sm" variant="ghost" onClick={() => duplicate(p)}>Duplicate</Btn>
-                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
                     </div>
                   </div>
                 );
@@ -830,38 +833,63 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     <div style={containerStyle}>
       <Sidebar tab={tab} setTab={(t: string) => { setTab(t); setSidebarOpen(false); }} open={sidebarOpen} setOpen={setSidebarOpen} isMobile={isMobile} brand={app.brand}/>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ height: 56, borderBottom: `1px solid ${ui.line}`, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", position: "sticky", top: 0, zIndex: 30 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2 }}>
-                <Icon.menu/>
-              </button>
-            )}
-            <button onClick={app.exitProject} title="Back to projects" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, height: 32, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: ui.ink2, fontSize: 12, fontWeight: 600 }}>
-              <span style={{ fontSize: 14 }}>←</span> Projects
-            </button>
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: ui.ink, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{app.projectName}</div>
-              <div style={{ fontSize: 10, color: ui.faint, ...ui.mono, letterSpacing: 0.4 }}>PROJECT</div>
+        {isMobile ? (
+          <header style={{ borderBottom: `1px solid ${ui.line}`, background: "#fff", position: "sticky", top: 0, zIndex: 30 }}>
+            <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, flexShrink: 0 }}>
+                  <Icon.menu/>
+                </button>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: ui.ink, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{app.projectName}</div>
+                  <button onClick={app.exitProject} style={{ background: "none", border: "none", padding: 0, fontSize: 10, color: ui.muted, ...ui.mono, letterSpacing: 0.4, textAlign: "left", cursor: "pointer" }}>← ALL PROJECTS</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <button onClick={() => setTab("scanner")} aria-label="Scan" style={{ background: ui.ink, color: "#fff", border: "none", borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer" }}>{Icon.camera(16)}</button>
+                <button aria-label="Alerts" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
+                  <Icon.bell/>
+                  {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
+                </button>
+              </div>
             </div>
-            <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, fontWeight: 600 }}>
-              {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
-          </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px 10px", overflowX: "auto" }}>
+              <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, padding: "6px 10px", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
+              <span style={{ ...ui.mono, fontSize: 11, color: ui.muted, marginLeft: "auto", flexShrink: 0 }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          </header>
+        ) : (
+          <header style={{ height: 56, borderBottom: `1px solid ${ui.line}`, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", position: "sticky", top: 0, zIndex: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <button onClick={app.exitProject} title="Back to projects" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, height: 32, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: ui.ink2, fontSize: 12, fontWeight: 600 }}>
+                <span style={{ fontSize: 14 }}>←</span> Projects
+              </button>
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: ui.ink, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{app.projectName}</div>
+                <div style={{ fontSize: 10, color: ui.faint, ...ui.mono, letterSpacing: 0.4 }}>PROJECT</div>
+              </div>
+              <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, fontWeight: 600 }}>
+                {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
+            </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Btn size="sm" variant="primary" onClick={() => setTab("scanner")} style={{ display: isMobile ? "none" : "inline-flex" }}>{Icon.camera(14)} Scan</Btn>
-            <div style={{ ...ui.mono, fontSize: 12, color: ui.muted, display: isMobile ? "none" : "block" }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-            <button style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
-              <Icon.bell/>
-              {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
-            </button>
-            <div style={{ width: 32, height: 32, borderRadius: 999, background: "#E5E7EB", color: ui.ink, display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12 }}>{app.brand[0]}</div>
-          </div>
-        </header>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Btn size="sm" variant="primary" onClick={() => setTab("scanner")}>{Icon.camera(14)} Scan</Btn>
+              <div style={{ ...ui.mono, fontSize: 12, color: ui.muted }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              <button style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2, position: "relative" }}>
+                <Icon.bell/>
+                {stats.critical > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, background: ui.bad, borderRadius: 999 }}/>}
+              </button>
+              <div style={{ width: 32, height: 32, borderRadius: 999, background: "#E5E7EB", color: ui.ink, display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12 }}>{app.brand[0]}</div>
+            </div>
+          </header>
+        )}
 
-        <main style={{ flex: 1, padding: isMobile ? 14 : 24, overflow: "auto" }}>
+        <main style={{ flex: 1, padding: isMobile ? 14 : 24, paddingBottom: isMobile ? 80 : 24, overflow: "auto" }}>
           {tab === "dashboard"    && <Dashboard stats={stats} setTab={setTab}/>}
           {tab === "scanner"      && <Scanner/>}
           {tab === "stations"     && <Stations/>}
@@ -875,6 +903,8 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive}/>}
           {tab === "settings"     && <Settings/>}
         </main>
+
+        {isMobile && <MobileTabBar tab={tab} setTab={setTab}/>}
       </div>
     </div>
   );
@@ -963,6 +993,44 @@ function Sidebar({ tab, setTab, open, setOpen, isMobile, brand }: any) {
       {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 40 }}/>}
       <div style={{ position: "fixed", left: 0, top: 0, zIndex: 50, transform: open ? "translateX(0)" : "translateX(-100%)", transition: "transform .25s" }}>{content}</div>
     </>
+  );
+}
+
+/* ---------- Mobile bottom tab bar ---------- */
+function MobileTabBar({ tab, setTab }: { tab: string; setTab: (t: string) => void }) {
+  const items = [
+    { id: "dashboard", label: "Home",      svg: NAV.find(n => n.id === "dashboard")!.svg },
+    { id: "inventory", label: "Inventory", svg: NAV.find(n => n.id === "inventory")!.svg },
+    { id: "scanner",   label: "Scan",      svg: Icon.camera(20), primary: true },
+    { id: "stations",  label: "Stations",  svg: NAV.find(n => n.id === "stations")!.svg },
+    { id: "reports",   label: "Reports",   svg: NAV.find(n => n.id === "reports")!.svg },
+  ];
+  return (
+    <nav style={{
+      position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40,
+      background: "#fff", borderTop: `1px solid ${ui.line}`,
+      display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      boxShadow: "0 -2px 12px rgba(16,24,40,.04)",
+    }}>
+      {items.map(it => {
+        const active = tab === it.id;
+        if (it.primary) {
+          return (
+            <button key={it.id} onClick={() => setTab(it.id)} style={{ background: "none", border: "none", padding: "8px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
+              <span style={{ width: 46, height: 46, borderRadius: 999, background: ui.ink, color: "#fff", display: "grid", placeItems: "center", marginTop: -18, boxShadow: ui.shadowMd }}>{it.svg}</span>
+              <span style={{ fontSize: 10, color: ui.ink, fontWeight: 600 }}>{it.label}</span>
+            </button>
+          );
+        }
+        return (
+          <button key={it.id} onClick={() => setTab(it.id)} style={{ background: "none", border: "none", padding: "10px 0 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? ui.ink : ui.muted }}>
+            <span style={{ opacity: active ? 1 : 0.75 }}>{it.svg}</span>
+            <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{it.label}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -1426,6 +1494,7 @@ function ItemRow({ it, setItems }: any) {
 
 function Inventory() {
   const { items, setItems, stations, categories } = useApp();
+  const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [stn, setStn] = useState("all");
@@ -1440,39 +1509,68 @@ function Inventory() {
     <div>
       <PageHeader title="Full Inventory" subtitle={`${items.length} SKUs · live tracking`} actions={<><Btn>Export CSV</Btn><Btn variant="primary">+ Add Item</Btn></>}/>
       <Card pad={0}>
-        <div style={{ display: "flex", gap: 10, padding: 14, borderBottom: `1px solid ${ui.lineSoft}`, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+        <div style={{ display: "flex", gap: 8, padding: isMobile ? 10 : 14, borderBottom: `1px solid ${ui.lineSoft}`, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 100%", minWidth: 0, position: "relative" }}>
             <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: ui.faint }}><Icon.search/></span>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search items…" style={{ ...inputStyle, padding: "8px 12px 8px 32px" }}/>
           </div>
-          <select value={cat} onChange={e => setCat(e.target.value)} style={selectStyle}><option value="all">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select>
-          <select value={stn} onChange={e => setStn(e.target.value)} style={selectStyle}><option value="all">All stations</option>{stations.map(s => <option key={s}>{s}</option>)}</select>
+          <select value={cat} onChange={e => setCat(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 0 }}><option value="all">All categories</option>{categories.map(c => <option key={c}>{c}</option>)}</select>
+          <select value={stn} onChange={e => setStn(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 0 }}><option value="all">All stations</option>{stations.map(s => <option key={s}>{s}</option>)}</select>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
-            <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
-              <Th>Item</Th><Th>Category</Th><Th>Station</Th><Th>Status</Th><Th align="right">On Hand</Th><Th align="right">Par</Th><Th align="right">Value</Th><Th align="right">7d</Th><Th></Th>
-            </tr></thead>
-            <tbody>
-              {filtered.map(it => {
-                const st = statusOf(it);
-                return (
-                  <tr key={it.id} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
-                    <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{it.name}{it.vendor && <span style={{ display: "block", fontSize: 10, color: ui.muted, fontWeight: 400, marginTop: 2 }}>via {it.vendor}</span>}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.category}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.station}</td>
-                    <td style={{ padding: "12px 16px" }}><Pill tone={st.tone}>{st.label}</Pill></td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12 }}>{it.current} {it.unit}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it.par}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.ink2 }}>${(it.current * it.costPerUnit).toFixed(0)}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}><Spark data={it.usage} w={70} h={20}/></td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}><Btn size="sm" variant="ghost" onClick={() => setItems(prev => prev.filter(x => x.id !== it.id))}><Icon.x/></Btn></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {isMobile ? (
+          <div>
+            {filtered.length === 0 && <div style={{ padding: 24, fontSize: 13, color: ui.muted, textAlign: "center" }}>No items match.</div>}
+            {filtered.map(it => {
+              const st = statusOf(it);
+              const pct = Math.min(100, (it.current / Math.max(it.par, 1)) * 100);
+              const barColor = st.tone === "bad" ? ui.bad : st.tone === "warn" ? ui.warn : ui.ok;
+              return (
+                <div key={it.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${ui.lineSoft}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: ui.ink }}>{it.name}</div>
+                      <div style={{ fontSize: 11, color: ui.muted, marginTop: 2 }}>{it.station} · {it.category}</div>
+                    </div>
+                    <Pill tone={st.tone}>{st.label}</Pill>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                    <div style={{ ...ui.mono, fontSize: 13, fontWeight: 600, color: ui.ink }}>{it.current}<span style={{ color: ui.faint, fontWeight: 400 }}>/{it.par}</span> {it.unit}</div>
+                    <div style={{ flex: 1, height: 4, background: ui.lineSoft, borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", background: barColor }}/>
+                    </div>
+                    <div style={{ ...ui.mono, fontSize: 11, color: ui.muted }}>${(it.current * it.costPerUnit).toFixed(0)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+              <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
+                <Th>Item</Th><Th>Category</Th><Th>Station</Th><Th>Status</Th><Th align="right">On Hand</Th><Th align="right">Par</Th><Th align="right">Value</Th><Th align="right">7d</Th><Th></Th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(it => {
+                  const st = statusOf(it);
+                  return (
+                    <tr key={it.id} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{it.name}{it.vendor && <span style={{ display: "block", fontSize: 10, color: ui.muted, fontWeight: 400, marginTop: 2 }}>via {it.vendor}</span>}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.category}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.station}</td>
+                      <td style={{ padding: "12px 16px" }}><Pill tone={st.tone}>{st.label}</Pill></td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12 }}>{it.current} {it.unit}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it.par}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.ink2 }}>${(it.current * it.costPerUnit).toFixed(0)}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}><Spark data={it.usage} w={70} h={20}/></td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}><Btn size="sm" variant="ghost" onClick={() => setItems(prev => prev.filter(x => x.id !== it.id))}><Icon.x/></Btn></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
