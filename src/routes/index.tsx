@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { scanImage } from "@/lib/scan.functions";
+import { ToastPanel } from "@/components/ToastPanel";
+import { SquarePanel } from "@/components/SquarePanel";
 
 export const Route = createFileRoute("/")({
   head: () => ({
