@@ -249,7 +249,7 @@ export async function persistOrder(opts: {
       external_id: order.id,
       merchant_id: opts.merchantId,
       location_id: opts.locationId,
-      items: items as unknown as Record<string, unknown>[],
+      items: items as any,
       total_cents: totalCents,
       currency,
       ordered_at: orderedAt,
