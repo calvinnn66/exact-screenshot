@@ -770,17 +770,25 @@ function Shell({ hydrated }: { hydrated: boolean }) {
       <Sidebar tab={tab} setTab={(t: string) => { setTab(t); setSidebarOpen(false); }} open={sidebarOpen} setOpen={setSidebarOpen} isMobile={isMobile} brand={app.brand}/>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <header style={{ height: 56, borderBottom: `1px solid ${ui.line}`, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", position: "sticky", top: 0, zIndex: 30 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             {isMobile && (
               <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", color: ui.ink2 }}>
                 <Icon.menu/>
               </button>
             )}
+            <button onClick={app.exitProject} title="Back to projects" style={{ background: "none", border: `1px solid ${ui.line}`, borderRadius: 8, height: 32, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: ui.ink2, fontSize: 12, fontWeight: 600 }}>
+              <span style={{ fontSize: 14 }}>←</span> Projects
+            </button>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: ui.ink, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{app.projectName}</div>
+              <div style={{ fontSize: 10, color: ui.faint, ...ui.mono, letterSpacing: 0.4 }}>PROJECT</div>
+            </div>
             <select value={app.activeLocationId ?? ""} onChange={(e) => app.setActiveLocationId(e.target.value || null)} style={{ ...selectStyle, fontWeight: 600 }}>
               {app.locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
             <Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} POS {posLive ? "Live" : "Paused"}</Pill>
           </div>
+
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Btn size="sm" variant="primary" onClick={() => setTab("scanner")} style={{ display: isMobile ? "none" : "inline-flex" }}>{Icon.camera(14)} Scan</Btn>
             <div style={{ ...ui.mono, fontSize: 12, color: ui.muted, display: isMobile ? "none" : "block" }}>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
