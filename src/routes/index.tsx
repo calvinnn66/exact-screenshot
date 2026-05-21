@@ -417,56 +417,290 @@ function useIsMobile() {
 }
 
 /* ============================================================
-   MAIN APP — provider + shell
+   ROOT — Launch → Project Picker → Workspace
    ============================================================ */
 function KitchenIntel() {
-  // hydrate from localStorage (first paint with seed; SSR-safe via effect)
   const [hydrated, setHydrated] = useState(false);
-  const [brand, setBrand] = useState("KitchenIntel");
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
-  const [stations, setStations] = useState<string[]>(DEFAULT_STATIONS);
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [vendors, setVendors] = useState<Vendor[]>(DEFAULT_VENDORS);
-  const [items, setItems] = useState<Item[]>([]);
-  const [menu, setMenu] = useState<MenuItem[]>(DEFAULT_MENU);
-  const [sales, setSales] = useState<SalesRow[]>([]);
+  const [store, setStore] = useState<ProjectsStore>({ projects: [], activeProjectId: null, sawWelcome: false });
+  const [view, setView] = useState<"launch" | "picker" | "app">("launch");
 
   useEffect(() => {
-    const s = loadState();
-    if (s) {
-      setBrand(s.brand ?? "KitchenIntel");
-      setLocations(s.locations ?? []);
-      setActiveLocationId(s.activeLocationId ?? null);
-      setStations(s.stations ?? DEFAULT_STATIONS);
-      setCategories(s.categories ?? DEFAULT_CATEGORIES);
-      setVendors(s.vendors ?? DEFAULT_VENDORS);
-      setItems(s.items?.length ? s.items : seedItems());
-      setMenu(s.menu ?? DEFAULT_MENU);
-    } else {
-      setItems(seedItems());
-    }
+    const s = loadProjects();
+    setStore(s);
+    if (s.sawWelcome && s.activeProjectId && s.projects.some(p => p.id === s.activeProjectId)) setView("app");
+    else if (s.sawWelcome) setView("picker");
+    else setView("launch");
     setHydrated(true);
   }, []);
 
+  useEffect(() => { if (hydrated) saveProjects(store); }, [hydrated, store]);
+
+  const startApp = () => setStore(s => ({ ...s, sawWelcome: true })) || setView("picker");
+  const openProject = (id: string) => {
+    setStore(s => ({
+      ...s, activeProjectId: id,
+      projects: s.projects.map(p => p.id === id ? { ...p, lastOpened: Date.now() } : p),
+    }));
+    setView("app");
+  };
+  const exitProject = () => { setStore(s => ({ ...s, activeProjectId: null })); setView("picker"); };
+  const updateProject = (id: string, patch: Partial<Project>) =>
+    setStore(s => ({ ...s, projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) }));
+  const addProject = (p: Project) => { setStore(s => ({ ...s, projects: [p, ...s.projects] })); };
+  const removeProject = (id: string) =>
+    setStore(s => ({ ...s, projects: s.projects.filter(p => p.id !== id), activeProjectId: s.activeProjectId === id ? null : s.activeProjectId }));
+
+  if (!hydrated) {
+    return <div style={{ minHeight: "100vh", background: ui.bg, display: "grid", placeItems: "center", ...ui.font }}><div style={{ color: ui.muted, fontSize: 13 }}>Loading…</div></div>;
+  }
+
+  if (view === "launch") return <LaunchScreen onStart={startApp}/>;
+  if (view === "picker") return <ProjectPicker store={store} onOpen={openProject} onCreate={addProject} onRemove={removeProject} onUpdate={updateProject}/>;
+
+  const project = store.projects.find(p => p.id === store.activeProjectId);
+  if (!project) { setView("picker"); return null; }
+
+  return (
+    <ProjectWorkspace
+      key={project.id}
+      project={project}
+      onPatchState={(state) => updateProject(project.id, { state })}
+      onExit={exitProject}
+    />
+  );
+}
+
+/* ---------- Launch screen ---------- */
+function LaunchScreen({ onStart }: { onStart: () => void }) {
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#FFFFFF 0%,#F4F5F7 100%)", ...ui.font, display: "grid", placeItems: "center", padding: 24 }}>
+      <div style={{ textAlign: "center", maxWidth: 520 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 64, height: 64, borderRadius: 14, background: ui.ink, color: "#fff", fontWeight: 800, fontSize: 28, letterSpacing: -1, marginBottom: 22, boxShadow: ui.shadowMd }}>K</div>
+        <h1 style={{ fontSize: 40, fontWeight: 700, letterSpacing: -1.2, margin: 0, color: ui.ink }}>KitchenIntel</h1>
+        <p style={{ fontSize: 14, color: ui.muted, marginTop: 8, marginBottom: 28, letterSpacing: 0.2 }}>AI Kitchen Operating System</p>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 16px", border: `1px solid ${ui.line}`, borderRadius: 999, background: "#fff", boxShadow: ui.shadow, marginBottom: 32 }}>
+          <span style={{ position: "relative", display: "inline-block", width: 14, height: 14 }}>
+            <span style={{ position: "absolute", inset: 0, borderRadius: 999, border: `2px solid ${ui.line}`, borderTopColor: ui.ink, animation: "ki-spin 1s linear infinite" }}/>
+          </span>
+          <span style={{ fontSize: 12, color: ui.muted, ...ui.mono, letterSpacing: 0.4 }}>initializing operating system</span>
+        </div>
+        <div>
+          <Btn variant="primary" size="lg" onClick={onStart} style={{ padding: "14px 36px", fontSize: 15 }}>Start →</Btn>
+        </div>
+        <div style={{ fontSize: 11, color: ui.faint, marginTop: 22, ...ui.mono, letterSpacing: 0.5 }}>v1.0 · enterprise · secure</div>
+      </div>
+      <style>{`@keyframes ki-spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+/* ---------- Project picker ---------- */
+function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
+  store: ProjectsStore;
+  onOpen: (id: string) => void;
+  onCreate: (p: Project) => void;
+  onRemove: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<Project>) => void;
+}) {
+  const [creating, setCreating] = useState(store.projects.length === 0);
+  const [q, setQ] = useState("");
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [rtype, setRtype] = useState("Restaurant");
+  const [seed, setSeed] = useState<"blank" | "demo">("blank");
+
+  const filtered = store.projects
+    .filter(p => p.name.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => b.lastOpened - a.lastOpened);
+
+  const create = () => {
+    if (!name.trim()) return;
+    const state = emptyPersist(name.trim());
+    if (location.trim()) {
+      const loc: Location = { id: uid("loc"), name: location.trim(), active: true };
+      state.locations = [loc]; state.activeLocationId = loc.id;
+    }
+    if (seed === "demo") {
+      state.items = seedItems();
+      state.menu = [...DEFAULT_MENU];
+      if (!state.locations.length) {
+        const loc: Location = { id: uid("loc"), name: "Main Location", active: true };
+        state.locations = [loc]; state.activeLocationId = loc.id;
+      }
+    }
+    const proj: Project = { id: uid("prj"), name: name.trim(), type: rtype, createdAt: Date.now(), lastOpened: Date.now(), state };
+    onCreate(proj);
+    onOpen(proj.id);
+  };
+
+  const duplicate = (p: Project) => {
+    const copy: Project = { ...p, id: uid("prj"), name: `${p.name} (Copy)`, createdAt: Date.now(), lastOpened: Date.now(),
+      state: JSON.parse(JSON.stringify(p.state)) };
+    onCreate(copy);
+  };
+
+  const rename = (p: Project) => {
+    const n = window.prompt("Rename project", p.name);
+    if (n && n.trim()) onUpdate(p.id, { name: n.trim() });
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "40px 24px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: ui.ink, color: "#fff", display: "grid", placeItems: "center", fontWeight: 800 }}>K</div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.4 }}>KitchenIntel</div>
+            <div style={{ fontSize: 12, color: ui.muted }}>Select a restaurant workspace to continue</div>
+          </div>
+        </div>
+
+        <Grid cols="1.4fr 1fr" gap={20}>
+          {/* Saved projects */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: -0.3 }}>Your projects</h2>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: ui.faint }}><Icon.search/></span>
+                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search projects" style={{ ...inputStyle, padding: "8px 12px 8px 32px", width: 220 }}/>
+                </div>
+                <Btn variant="primary" onClick={() => setCreating(true)}><Icon.plus/> New Project</Btn>
+              </div>
+            </div>
+            {filtered.length === 0 && (
+              <Card><div style={{ fontSize: 13, color: ui.muted, textAlign: "center", padding: 28 }}>
+                {store.projects.length === 0 ? "No projects yet — create your first restaurant workspace to begin." : "No matches."}
+              </div></Card>
+            )}
+            <div style={{ display: "grid", gap: 12 }}>
+              {filtered.map(p => {
+                const crit = p.state.items.filter(i => i.current <= i.par * 0.4).length;
+                return (
+                  <div key={p.id} style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, boxShadow: ui.shadow, padding: 18, display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 14 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3 }}>{p.name}</div>
+                        {p.type && <Pill tone="neutral">{p.type}</Pill>}
+                        {crit > 0 ? <Pill tone="bad">{crit} critical</Pill> : <Pill tone="ok">healthy</Pill>}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: ui.muted }}>
+                        <span>{p.state.locations.length} location{p.state.locations.length === 1 ? "" : "s"}</span>
+                        <span>{p.state.items.length} items</span>
+                        <span>{p.state.stationModules.filter(s => !s.hidden).length} stations</span>
+                        <span style={{ ...ui.mono, fontSize: 11 }}>opened {timeAgo(p.lastOpened)}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Btn variant="primary" onClick={() => onOpen(p.id)}>Open</Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => rename(p)}>Rename</Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => duplicate(p)}>Duplicate</Btn>
+                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Create panel */}
+          <div>
+            <Card title={creating ? "Create new project" : "About projects"} subtitle={creating ? "Each project is a separate restaurant workspace" : ""}>
+              {creating ? (
+                <div>
+                  <Field label="Project name" value={name} onChange={setName} placeholder="e.g. Town Course Kitchen"/>
+                  <Field label="Location (optional)" value={location} onChange={setLocation} placeholder="e.g. Flagship · Downtown"/>
+                  <FieldLabel>Restaurant type</FieldLabel>
+                  <select value={rtype} onChange={e => setRtype(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
+                    {["Restaurant","Fine Dining","Fast Casual","QSR","Cafe","Bar / Pub","Hotel F&B","Catering","Golf Club","Ghost Kitchen"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <FieldLabel>Start with</FieldLabel>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                    {(["blank","demo"] as const).map(s => (
+                      <button key={s} onClick={() => setSeed(s)} style={{
+                        padding: "12px 10px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+                        border: `1px solid ${seed === s ? ui.ink : ui.line}`, background: seed === s ? ui.ink : "#fff", color: seed === s ? "#fff" : ui.ink,
+                      }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{s === "blank" ? "Blank inventory" : "Demo template"}</div>
+                        <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{s === "blank" ? "Start clean, add items via scanner" : "Sample burger-grill menu & stock"}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn variant="primary" onClick={create} disabled={!name.trim()} style={{ flex: 1, justifyContent: "center" }}>Create & Open</Btn>
+                    {store.projects.length > 0 && <Btn variant="ghost" onClick={() => setCreating(false)}>Cancel</Btn>}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 13, color: ui.ink2, lineHeight: 1.6 }}>
+                    Every restaurant runs as its own KitchenIntel project — independent inventory, stations, recipes, sales, and integrations.
+                  </div>
+                  <div style={{ marginTop: 14, padding: 12, background: ui.panel2, border: `1px solid ${ui.lineSoft}`, borderRadius: 8, fontSize: 12, color: ui.muted }}>
+                    Multi-location restaurants can manage all venues inside a single project, or split them into separate projects for clean reporting.
+                  </div>
+                  <Btn variant="primary" onClick={() => setCreating(true)} style={{ marginTop: 14, width: "100%", justifyContent: "center" }}><Icon.plus/> New Project</Btn>
+                </div>
+              )}
+            </Card>
+          </div>
+        </Grid>
+      </div>
+    </div>
+  );
+}
+
+function timeAgo(ts: number) {
+  const d = Date.now() - ts;
+  if (d < 60_000) return "just now";
+  if (d < 3600_000) return `${Math.floor(d / 60_000)}m ago`;
+  if (d < 86_400_000) return `${Math.floor(d / 3600_000)}h ago`;
+  return `${Math.floor(d / 86_400_000)}d ago`;
+}
+
+/* ---------- Project workspace (the original KitchenIntel shell) ---------- */
+function ProjectWorkspace({ project, onPatchState, onExit }: { project: Project; onPatchState: (s: Persist) => void; onExit: () => void }) {
+  const init = project.state;
+  const [brand, setBrand] = useState(init.brand);
+  const [locations, setLocations] = useState<Location[]>(init.locations);
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(init.activeLocationId);
+  const [stationModules, setStationModules] = useState<StationModule[]>(init.stationModules);
+  const [categories, setCategories] = useState<string[]>(init.categories);
+  const [vendors, setVendors] = useState<Vendor[]>(init.vendors);
+  const [items, setItems] = useState<Item[]>(init.items);
+  const [menu, setMenu] = useState<MenuItem[]>(init.menu);
+  const [sales, setSales] = useState<SalesRow[]>([]);
+
+  // derived visible station names (sorted by order)
+  const stations = useMemo(
+    () => stationModules.filter(s => !s.hidden).sort((a, b) => a.order - b.order).map(s => s.name),
+    [stationModules]
+  );
+
+  // persist on change (debounced via simple effect)
   useEffect(() => {
-    if (!hydrated) return;
-    saveState({ brand, locations, activeLocationId, stations, categories, vendors, items, menu });
-  }, [hydrated, brand, locations, activeLocationId, stations, categories, vendors, items, menu]);
+    const t = setTimeout(() => {
+      onPatchState({ brand, locations, activeLocationId, stationModules, categories, vendors, items, menu });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [brand, locations, activeLocationId, stationModules, categories, vendors, items, menu]);
 
   const ctxValue: AppCtx = {
     brand, setBrand,
     locations, setLocations, activeLocationId, setActiveLocationId,
-    stations, setStations, categories, setCategories, vendors, setVendors,
+    stationModules, setStationModules, stations,
+    categories, setCategories, vendors, setVendors,
     items, setItems, menu, setMenu, sales, setSales,
+    projectName: project.name, exitProject: onExit,
   };
 
   return (
     <Ctx.Provider value={ctxValue}>
-      <Shell hydrated={hydrated}/>
+      <Shell hydrated={true}/>
     </Ctx.Provider>
   );
 }
+
 
 function Shell({ hydrated }: { hydrated: boolean }) {
   const app = useApp();
