@@ -394,11 +394,12 @@ function statusOf(it: Item): { tone: "ok" | "warn" | "bad"; label: string } {
 }
 const Th = ({ children, align = "left" }: any) => <th style={{ padding: "10px 16px", textAlign: align, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, color: ui.muted }}>{children}</th>;
 function PageHeader({ title, subtitle, actions }: any) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: isMobile ? "stretch" : "flex-end", justifyContent: "space-between", marginBottom: isMobile ? 14 : 18, flexWrap: "wrap", gap: isMobile ? 10 : 12, flexDirection: isMobile ? "column" : "row" }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: ui.ink, letterSpacing: -0.5 }}>{title}</h1>
-        {subtitle && <div style={{ fontSize: 13, color: ui.muted, marginTop: 4 }}>{subtitle}</div>}
+        <h1 style={{ margin: 0, fontSize: isMobile ? 19 : 22, fontWeight: 700, color: ui.ink, letterSpacing: -0.5 }}>{title}</h1>
+        {subtitle && <div style={{ fontSize: isMobile ? 12 : 13, color: ui.muted, marginTop: 4 }}>{subtitle}</div>}
       </div>
       {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
     </div>
