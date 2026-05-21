@@ -168,27 +168,90 @@ const INTEGRATIONS_SEED: Integration[] = [
 ];
 
 /* ============================================================
-   STORAGE
+   STORAGE — multi-project
    ============================================================ */
-const LS_KEY = "ki_state_v1";
+const uid = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+const LS_LEGACY = "ki_state_v1";
+const LS_PROJECTS = "ki_projects_v1";
+
 type Persist = {
   brand: string;
   locations: Location[];
   activeLocationId: string | null;
-  stations: string[];
+  stationModules: StationModule[];
   categories: string[];
   vendors: Vendor[];
   items: Item[];
   menu: MenuItem[];
 };
-function loadState(): Persist | null {
-  if (typeof window === "undefined") return null;
-  try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+
+export type Project = {
+  id: string;
+  name: string;
+  type?: string;
+  createdAt: number;
+  lastOpened: number;
+  state: Persist;
+};
+
+type ProjectsStore = {
+  projects: Project[];
+  activeProjectId: string | null;
+  sawWelcome: boolean;
+};
+
+function emptyPersist(brand = "KitchenIntel"): Persist {
+  return {
+    brand,
+    locations: [],
+    activeLocationId: null,
+    stationModules: buildDefaultStationModules(),
+    categories: [...DEFAULT_CATEGORIES],
+    vendors: [...DEFAULT_VENDORS],
+    items: [],
+    menu: [],
+  };
 }
-function saveState(s: Persist) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+
+function migrateStations(p: any): Persist {
+  // back-compat: convert legacy stations: string[] to stationModules
+  if (Array.isArray(p?.stations) && !p.stationModules) {
+    p.stationModules = (p.stations as string[]).map((n, i) => {
+      const tpl = STATION_TEMPLATES.find(t => t.name === n);
+      return { id: uid("stn"), name: n, templateId: tpl?.id, type: tpl?.type ?? "custom", hidden: false, order: i };
+    });
+  }
+  if (!p.stationModules?.length) p.stationModules = buildDefaultStationModules();
+  return p as Persist;
 }
-const uid = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+
+function loadProjects(): ProjectsStore {
+  if (typeof window === "undefined") return { projects: [], activeProjectId: null, sawWelcome: false };
+  try {
+    const raw = localStorage.getItem(LS_PROJECTS);
+    if (raw) {
+      const s = JSON.parse(raw) as ProjectsStore;
+      s.projects = s.projects.map(p => ({ ...p, state: migrateStations(p.state) }));
+      return s;
+    }
+    // migrate from legacy single workspace
+    const legacy = localStorage.getItem(LS_LEGACY);
+    if (legacy) {
+      const st = migrateStations(JSON.parse(legacy));
+      const proj: Project = {
+        id: uid("prj"),
+        name: st.brand || "My Restaurant",
+        createdAt: Date.now(), lastOpened: Date.now(),
+        state: st,
+      };
+      return { projects: [proj], activeProjectId: proj.id, sawWelcome: false };
+    }
+  } catch {}
+  return { projects: [], activeProjectId: null, sawWelcome: false };
+}
+function saveProjects(s: ProjectsStore) {
+  try { localStorage.setItem(LS_PROJECTS, JSON.stringify(s)); } catch {}
+}
 
 /* ============================================================
    APP CONTEXT
@@ -197,13 +260,21 @@ type AppCtx = {
   brand: string; setBrand: (s: string) => void;
   locations: Location[]; setLocations: React.Dispatch<React.SetStateAction<Location[]>>;
   activeLocationId: string | null; setActiveLocationId: (id: string | null) => void;
-  stations: string[]; setStations: React.Dispatch<React.SetStateAction<string[]>>;
+  // station modules (canonical)
+  stationModules: StationModule[];
+  setStationModules: React.Dispatch<React.SetStateAction<StationModule[]>>;
+  // derived visible-station names — kept for back-compat consumers
+  stations: string[];
   categories: string[]; setCategories: React.Dispatch<React.SetStateAction<string[]>>;
   vendors: Vendor[]; setVendors: React.Dispatch<React.SetStateAction<Vendor[]>>;
   items: Item[]; setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   menu: MenuItem[]; setMenu: React.Dispatch<React.SetStateAction<MenuItem[]>>;
   sales: SalesRow[]; setSales: React.Dispatch<React.SetStateAction<SalesRow[]>>;
+  // project lifecycle
+  projectName: string;
+  exitProject: () => void;
 };
+
 const Ctx = createContext<AppCtx | null>(null);
 const useApp = () => {
   const c = useContext(Ctx);
