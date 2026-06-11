@@ -274,6 +274,7 @@ type AppCtx = {
   menu: MenuItem[]; setMenu: React.Dispatch<React.SetStateAction<MenuItem[]>>;
   sales: SalesRow[]; setSales: React.Dispatch<React.SetStateAction<SalesRow[]>>;
   // project lifecycle
+  projectId: string;
   projectName: string;
   exitProject: () => void;
 };
@@ -697,7 +698,7 @@ function ProjectWorkspace({ project, onPatchState, onExit }: { project: Project;
     stationModules, setStationModules, stations,
     categories, setCategories, vendors, setVendors,
     items, setItems, menu, setMenu, sales, setSales,
-    projectName: project.name, exitProject: onExit,
+    projectId: project.id, projectName: project.name, exitProject: onExit,
   };
 
   return (
@@ -755,7 +756,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
   const processedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!posLive) return;
-    const projectId = "aa475a88-be51-4f31-9bb2-d0266a47d1be";
+    const projectId = app.projectId;
     let cancelled = false;
     const tick = async () => {
       try {
@@ -1846,8 +1847,7 @@ function Deliveries() {
 }
 
 function Integrations({ integrations, setIntegrations, posLive, setPosLive }: any) {
-  const { menu } = useApp();
-  const projectId = "aa475a88-be51-4f31-9bb2-d0266a47d1be";
+  const { menu, projectId } = useApp();
   const menuSkus = menu.map((m: any) => ({ sku: m.id, name: m.name }));
   return (
     <div>
