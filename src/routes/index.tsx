@@ -1056,7 +1056,7 @@ function Dashboard({ stats, setTab }: any) {
       </Grid>
 
       <Grid cols="2fr 1fr" gap={16}>
-        <Card title="Hourly Item Velocity" subtitle="Items sold per hour from connected POS" action={<Pill tone="info">Toast · Live</Pill>}>
+        <Card title="Hourly Item Velocity" subtitle="Items sold per hour from connected POS" action={sales.length > 0 ? <Pill tone="ok">{Icon.dot(ui.ok)} Live</Pill> : undefined}>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 140 }}>
             {hourly.map((v, i) => { const max = Math.max(...hourly, 1); return (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -1080,7 +1080,7 @@ function Dashboard({ stats, setTab }: any) {
       </Grid>
 
       <Grid cols="1fr 1fr" gap={16} style={{ marginTop: 16 }}>
-        <Card title="Live Sales Feed" subtitle="Streaming from Toast POS" action={<Pill tone="ok">{Icon.dot(ui.ok)} Streaming</Pill>}>
+        <Card title="Live Sales Feed" subtitle="Streaming from connected POS" action={recent.length > 0 ? <Pill tone="ok">{Icon.dot(ui.ok)} Streaming</Pill> : undefined}>
           {recent.length === 0 ? <div style={{ fontSize: 13, color: ui.muted, padding: 12 }}>Waiting for POS events…</div> :
             recent.map((r, i) => { const m = menu.find(mm => mm.id === r.menuId); return (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${ui.lineSoft}` }}>
@@ -1633,7 +1633,7 @@ function SalesIntel() {
 
   return (
     <div>
-      <PageHeader title="Sales Intelligence" subtitle="Hourly velocity, item mix, ingredient burn" actions={<Pill tone="info">Toast · synced live</Pill>}/>
+      <PageHeader title="Sales Intelligence" subtitle="Hourly velocity, item mix, ingredient burn" actions={sales.length > 0 ? <Pill tone="ok">{Icon.dot(ui.ok)} Live</Pill> : undefined}/>
       <Grid cols="repeat(auto-fit, minmax(200px, 1fr))" gap={12} style={{ marginBottom: 16 }}>
         <Stat label="Net Sales" value={`$${totalRev.toFixed(0)}`} trend={{ dir: "up", v: "12.4%", good: true }}/>
         <Stat label="Items Sold" value={String(totalQty)}/>
