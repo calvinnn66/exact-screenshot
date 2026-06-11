@@ -49,7 +49,7 @@ type MenuItem = {
   posMap: { toast?: string; square?: string; clover?: string };
   recipe: RecipeIngredient[];
 };
-type SalesRow = { menuId: string; hour: number; qty: number };
+type SalesRow = { menuId: string; hour: number; qty: number; ts: number };
 type Location = { id: string; name: string; address?: string; active: boolean };
 type Vendor = { id: string; name: string; contact?: string; category?: string };
 type Integration = {
@@ -731,7 +731,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
         const m = app.menu[Math.floor(Math.random() * app.menu.length)];
         if (!m) continue;
         const qty = 1 + Math.floor(Math.random() * 3);
-        newRows.push({ menuId: m.id, hour, qty });
+        newRows.push({ menuId: m.id, hour, qty, ts: Date.now() });
       }
       app.setItems(prev => {
         const next = prev.map(p => ({ ...p }));
@@ -775,7 +775,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
             const menu = app.menu.find((m: any) => m.id === item.menuSku);
             if (!menu) continue;
             const qty = Number(item.quantity) || 1;
-            newSalesRows.push({ menuId: menu.id, hour, qty });
+            newSalesRows.push({ menuId: menu.id, hour, qty, ts: Date.now() });
             inventoryHits.push({ menuId: menu.id, qty });
           }
         }
@@ -1084,7 +1084,7 @@ function Dashboard({ stats, setTab }: any) {
             recent.map((r, i) => { const m = menu.find(mm => mm.id === r.menuId); return (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${ui.lineSoft}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ ...ui.mono, fontSize: 10, color: ui.faint }}>{String(r.hour).padStart(2,"0")}:{String(Math.floor(Math.random()*60)).padStart(2,"0")}</span>
+                  <span style={{ ...ui.mono, fontSize: 10, color: ui.faint }}>{String(r.hour).padStart(2,"0")}:{String(new Date(r.ts).getMinutes()).padStart(2,"0")}</span>
                   <span style={{ fontSize: 13 }}>{m?.name}</span>
                   <Pill tone="neutral">×{r.qty}</Pill>
                 </div>
