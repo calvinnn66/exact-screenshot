@@ -55,6 +55,7 @@ type Vendor = { id: string; name: string; contact?: string; category?: string };
 type Integration = {
   id: string; name: string; category: "POS" | "Accounting" | "Reporting" | "Supplier";
   status: "connected" | "available" | "error"; lastSync?: string; records?: number;
+  implemented?: boolean;
 };
 type StationType =
   | "line" | "grill" | "fry" | "flat-top" | "cold" | "prep" | "pantry" | "expo"
@@ -160,13 +161,13 @@ const DEFAULT_MENU: MenuItem[] = [
 ];
 
 const INTEGRATIONS_SEED: Integration[] = [
-  { id: "toast",      name: "Toast POS",      category: "POS", status: "connected", lastSync: "live", records: 1284 },
-  { id: "square",     name: "Square",         category: "POS", status: "available" },
-  { id: "clover",     name: "Clover",         category: "POS", status: "available" },
-  { id: "lightspeed", name: "Lightspeed",     category: "POS", status: "available" },
-  { id: "revel",      name: "Revel Systems",  category: "POS", status: "available" },
-  { id: "shopify",    name: "Shopify POS",    category: "POS", status: "available" },
-  { id: "ncr",        name: "NCR Aloha",      category: "POS", status: "available" },
+  { id: "toast",      name: "Toast POS",      category: "POS",        status: "connected", lastSync: "live", records: 1284, implemented: true },
+  { id: "square",     name: "Square",         category: "POS",        status: "available", implemented: true },
+  { id: "clover",     name: "Clover",         category: "POS",        status: "available" },
+  { id: "lightspeed", name: "Lightspeed",     category: "POS",        status: "available" },
+  { id: "revel",      name: "Revel Systems",  category: "POS",        status: "available" },
+  { id: "shopify",    name: "Shopify POS",    category: "POS",        status: "available" },
+  { id: "ncr",        name: "NCR Aloha",      category: "POS",        status: "available" },
   { id: "qbooks",     name: "QuickBooks",     category: "Accounting", status: "available" },
 ];
 
@@ -1885,7 +1886,9 @@ function Integrations({ integrations, setIntegrations, posLive, setPosLive }: an
                     <Pill tone={ig.status === "connected" ? "ok" : ig.status === "error" ? "bad" : "neutral"}>{ig.status === "connected" ? "Connected" : ig.status === "error" ? "Error" : "Available"}</Pill>
                     {ig.status === "connected"
                       ? <Btn size="sm" variant="ghost">Configure</Btn>
-                      : <Btn size="sm" onClick={() => setIntegrations((prev: Integration[]) => prev.map(p => p.id === ig.id ? { ...p, status: "connected", lastSync: "just now" } : p))}>Connect</Btn>}
+                      : ig.implemented
+                        ? null
+                        : <span style={{ fontSize: 11, color: ui.faint, fontStyle: "italic" }}>Coming soon</span>}
                   </div>
                 </div>
               ))}
