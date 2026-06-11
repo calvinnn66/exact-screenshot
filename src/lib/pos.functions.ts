@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireAdmin } from "./admin-guard";
 
 /*
   Unified POS live feed.
@@ -17,6 +18,8 @@ export const getLivePosFeed = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ data }) => {
+    if (!requireAdmin()) return { ok: false as const, error: "admin-unavailable", rows: [] as any[] };
+
     const sinceIso = data.sinceIso || new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
     const { data: rows, error } = await supabaseAdmin

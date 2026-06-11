@@ -45,7 +45,14 @@ All application data (inventory items, station modules, recipes, sales, vendors,
 
 ### Supabase clients
 - `src/integrations/supabase/client.ts` — browser client, uses `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (anon key, respects RLS)
-- `src/integrations/supabase/client.server.ts` — server-only admin client, uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS)
+- `src/integrations/supabase/client.server.ts` — server-only admin client, uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS); **auto-generated — do not edit**
+
+### Local dev vs Lovable Cloud
+The full backend (POS sync, webhook processing, admin Supabase operations) runs through **Lovable Cloud** in production. `SUPABASE_SERVICE_ROLE_KEY` is injected by Lovable Cloud and is not required locally for normal frontend work — inventory, UI, and all localStorage-based state work without it.
+
+`src/lib/admin-guard.ts` provides a `requireAdmin()` helper that warns once to the terminal and returns `false` when the key is missing. Apply it at the top of any server function that is called **automatically** (e.g. polling loops). User-triggered server functions (button clicks, webhook routes) can throw normally since they only fire on explicit action.
+
+The only auto-polling server function is `getLivePosFeed` (called every 8 s in `Shell`). It already uses `requireAdmin()` and returns `{ ok: false, rows: [] }` silently when the key is absent.
 
 ### POS integrations
 - **Toast** (`src/lib/toast.server.ts`): client_credentials flow — restaurants supply their own `clientId`/`clientSecret` from Toast Web; tokens are stored in the `toast_connections` Supabase table and auto-refreshed
