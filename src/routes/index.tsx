@@ -6,6 +6,7 @@ import { ToastPanel } from "@/components/ToastPanel";
 import { SquarePanel } from "@/components/SquarePanel";
 import { getLivePosFeed } from "@/lib/pos.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchUserProjects, upsertProject, deleteProjectFromDb } from "@/lib/projects-db";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -176,6 +177,7 @@ const INTEGRATIONS_SEED: Integration[] = [
    STORAGE — multi-project
    ============================================================ */
 const uid = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+const newProjectId = () => crypto.randomUUID();
 const LS_LEGACY = "ki_state_v1";
 const LS_PROJECTS = "ki_projects_v1";
 
@@ -230,7 +232,7 @@ function migrateStations(p: any): Persist {
   return p as Persist;
 }
 
-function loadProjects(): ProjectsStore {
+function readLocalStore(): ProjectsStore {
   if (typeof window === "undefined") return { projects: [], activeProjectId: null, sawWelcome: false };
   try {
     const raw = localStorage.getItem(LS_PROJECTS);
@@ -239,12 +241,11 @@ function loadProjects(): ProjectsStore {
       s.projects = s.projects.map(p => ({ ...p, state: migrateStations(p.state) }));
       return s;
     }
-    // migrate from legacy single workspace
     const legacy = localStorage.getItem(LS_LEGACY);
     if (legacy) {
       const st = migrateStations(JSON.parse(legacy));
       const proj: Project = {
-        id: uid("prj"),
+        id: newProjectId(),
         name: st.brand || "My Restaurant",
         createdAt: Date.now(), lastOpened: Date.now(),
         state: st,
@@ -252,6 +253,53 @@ function loadProjects(): ProjectsStore {
       return { projects: [proj], activeProjectId: proj.id, sawWelcome: false };
     }
   } catch {}
+  return { projects: [], activeProjectId: null, sawWelcome: false };
+}
+
+async function loadProjects(userId: string): Promise<ProjectsStore> {
+  const ls = readLocalStore();
+
+  try {
+    const rows = await fetchUserProjects();
+
+    if (rows.length > 0) {
+      const projects: Project[] = rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        type: r.type ?? undefined,
+        createdAt: new Date(r.created_at).getTime(),
+        lastOpened: new Date(r.updated_at).getTime(),
+        state: migrateStations(r.state),
+      }));
+      const store: ProjectsStore = { projects, activeProjectId: null, sawWelcome: true };
+      saveProjects(store);
+      return store;
+    }
+
+    if (ls.projects.length > 0) {
+      const idMap = new Map<string, string>();
+      const migrated: Project[] = ls.projects.map(p => {
+        const newId = newProjectId();
+        idMap.set(p.id, newId);
+        return { ...p, id: newId };
+      });
+
+      await Promise.all(
+        migrated.map(p => upsertProject(p.id, userId, p.name, p.type ?? null, p.state))
+      );
+
+      const store: ProjectsStore = {
+        ...ls,
+        projects: migrated,
+        activeProjectId: ls.activeProjectId ? (idMap.get(ls.activeProjectId) ?? null) : null,
+      };
+      saveProjects(store);
+      return store;
+    }
+  } catch {
+    return ls;
+  }
+
   return { projects: [], activeProjectId: null, sawWelcome: false };
 }
 function saveProjects(s: ProjectsStore) {
