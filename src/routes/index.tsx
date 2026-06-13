@@ -5,6 +5,7 @@ import { scanImage } from "@/lib/scan.functions";
 import { ToastPanel } from "@/components/ToastPanel";
 import { SquarePanel } from "@/components/SquarePanel";
 import { getLivePosFeed } from "@/lib/pos.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -278,6 +279,9 @@ type AppCtx = {
   projectId: string;
   projectName: string;
   exitProject: () => void;
+  // auth
+  userEmail: string;
+  signOut: () => Promise<void>;
 };
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -429,15 +433,39 @@ function KitchenIntel() {
   const [hydrated, setHydrated] = useState(false);
   const [store, setStore] = useState<ProjectsStore>({ projects: [], activeProjectId: null, sawWelcome: false });
   const [view, setView] = useState<"launch" | "picker" | "app">("launch");
+  const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
+  // Supabase auth: restore session on mount and react to sign-in / sign-out
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        setAuthUser({ id: data.session.user.id, email: data.session.user.email ?? "" });
+      }
+      setAuthChecked(true);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      if (session?.user) {
+        setAuthUser({ id: session.user.id, email: session.user.email ?? "" });
+      } else {
+        setAuthUser(null);
+        setView("launch");
+        setHydrated(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load projects only after we know whether the user is authenticated
+  useEffect(() => {
+    if (!authChecked || !authUser) return;
     const s = loadProjects();
     setStore(s);
     if (s.sawWelcome && s.activeProjectId && s.projects.some(p => p.id === s.activeProjectId)) setView("app");
     else if (s.sawWelcome) setView("picker");
     else setView("launch");
     setHydrated(true);
-  }, []);
+  }, [authChecked, authUser?.id]);
 
   useEffect(() => { if (hydrated) saveProjects(store); }, [hydrated, store]);
 
@@ -456,6 +484,12 @@ function KitchenIntel() {
   const removeProject = (id: string) =>
     setStore(s => ({ ...s, projects: s.projects.filter(p => p.id !== id), activeProjectId: s.activeProjectId === id ? null : s.activeProjectId }));
 
+  if (!authChecked) {
+    return <div style={{ minHeight: "100vh", background: ui.bg, display: "grid", placeItems: "center", ...ui.font }}><div style={{ color: ui.muted, fontSize: 13 }}>Loading…</div></div>;
+  }
+
+  if (!authUser) return <AuthScreen />;
+
   if (!hydrated) {
     return <div style={{ minHeight: "100vh", background: ui.bg, display: "grid", placeItems: "center", ...ui.font }}><div style={{ color: ui.muted, fontSize: 13 }}>Loading…</div></div>;
   }
@@ -470,6 +504,7 @@ function KitchenIntel() {
     <ProjectWorkspace
       key={project.id}
       project={project}
+      userEmail={authUser.email}
       onPatchState={(state) => updateProject(project.id, { state })}
       onExit={exitProject}
     />
@@ -496,6 +531,80 @@ function LaunchScreen({ onStart }: { onStart: () => void }) {
         <div style={{ fontSize: 11, color: ui.faint, marginTop: 22, ...ui.mono, letterSpacing: 0.5 }}>v1.0 · enterprise · secure</div>
       </div>
       <style>{`@keyframes ki-spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+/* ---------- Auth screen ---------- */
+function AuthScreen() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!email.trim() || !password.trim()) return;
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+    if (mode === "login") {
+      const { error: e } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (e) setError(e.message);
+    } else {
+      const { error: e } = await supabase.auth.signUp({ email: email.trim(), password });
+      if (e) setError(e.message);
+      else setInfo("Check your email to confirm your account, then sign in.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#FFFFFF 0%,#F4F5F7 100%)", ...ui.font, display: "grid", placeItems: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 48, height: 48, borderRadius: 12, background: ui.ink, color: "#fff", fontWeight: 800, fontSize: 22, letterSpacing: -1, marginBottom: 16, boxShadow: ui.shadowMd }}>K</div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6, margin: 0, color: ui.ink }}>KitchenIntel</h1>
+          <p style={{ fontSize: 13, color: ui.muted, marginTop: 6, marginBottom: 0 }}>{mode === "login" ? "Sign in to your workspace" : "Create your account"}</p>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${ui.line}`, borderRadius: 12, padding: 28, boxShadow: ui.shadowMd }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: ui.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Email</div>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@restaurant.com"
+              style={inputStyle}
+              onKeyDown={e => e.key === "Enter" && submit()}
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: ui.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Password</div>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder={mode === "login" ? "••••••••" : "8+ characters"}
+              style={inputStyle}
+              onKeyDown={e => e.key === "Enter" && submit()}
+            />
+          </div>
+          {error && <div style={{ padding: "8px 12px", background: ui.badBg, borderRadius: 6, color: ui.bad, fontSize: 12, marginBottom: 14 }}>{error}</div>}
+          {info && <div style={{ padding: "8px 12px", background: ui.okBg, borderRadius: 6, color: ui.ok, fontSize: 12, marginBottom: 14 }}>{info}</div>}
+          <Btn variant="primary" size="lg" onClick={submit} disabled={loading || !email.trim() || !password.trim()} style={{ width: "100%", justifyContent: "center" }}>
+            {loading ? "…" : mode === "login" ? "Sign in" : "Create account"}
+          </Btn>
+          <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: ui.muted }}>
+            {mode === "login" ? (
+              <>No account?{" "}<button onClick={() => { setMode("signup"); setError(null); setInfo(null); }} style={{ background: "none", border: "none", color: ui.info, cursor: "pointer", fontWeight: 600, fontSize: 12, padding: 0 }}>Create one</button></>
+            ) : (
+              <>Have an account?{" "}<button onClick={() => { setMode("login"); setError(null); setInfo(null); }} style={{ background: "none", border: "none", color: ui.info, cursor: "pointer", fontWeight: 600, fontSize: 12, padding: 0 }}>Sign in</button></>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -667,7 +776,7 @@ function timeAgo(ts: number) {
 }
 
 /* ---------- Project workspace (the original KitchenIntel shell) ---------- */
-function ProjectWorkspace({ project, onPatchState, onExit }: { project: Project; onPatchState: (s: Persist) => void; onExit: () => void }) {
+function ProjectWorkspace({ project, userEmail, onPatchState, onExit }: { project: Project; userEmail: string; onPatchState: (s: Persist) => void; onExit: () => void }) {
   const init = project.state;
   const [brand, setBrand] = useState(init.brand);
   const [locations, setLocations] = useState<Location[]>(init.locations);
@@ -700,6 +809,8 @@ function ProjectWorkspace({ project, onPatchState, onExit }: { project: Project;
     categories, setCategories, vendors, setVendors,
     items, setItems, menu, setMenu, sales, setSales,
     projectId: project.id, projectName: project.name, exitProject: onExit,
+    userEmail,
+    signOut: () => supabase.auth.signOut().then(() => {}),
   };
 
   return (
@@ -955,6 +1066,7 @@ function Onboarding() {
    SIDEBAR
    ============================================================ */
 function Sidebar({ tab, setTab, open, setOpen, isMobile, brand }: any) {
+  const app = useApp();
   const content = (
     <div style={{ width: 240, background: ui.sidebar, color: ui.sidebarText, height: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid #1F232A` }}>
@@ -983,6 +1095,14 @@ function Sidebar({ tab, setTab, open, setOpen, isMobile, brand }: any) {
           );
         })}
       </nav>
+      <div style={{ padding: "10px 14px", borderTop: `1px solid #1F232A` }}>
+        <div style={{ fontSize: 10, color: ui.sidebarMuted, marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...ui.mono }}>{app.userEmail}</div>
+        <button onClick={app.signOut} style={{ width: "100%", background: "transparent", border: `1px solid #2A2F38`, borderRadius: 6, color: ui.sidebarMuted, fontSize: 11, fontWeight: 500, padding: "5px 10px", cursor: "pointer", textAlign: "left" }}
+          onMouseEnter={e => (e.currentTarget.style.background = ui.sidebarHover)}
+          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+          Sign out
+        </button>
+      </div>
       <div style={{ padding: 14, borderTop: `1px solid #1F232A`, fontSize: 11, color: ui.sidebarMuted }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span>Sync health</span><span style={{ color: ui.ok }}>● 99.8%</span></div>
         <div style={{ ...ui.mono, fontSize: 10 }}>edge-us-west-2 · 12ms</div>

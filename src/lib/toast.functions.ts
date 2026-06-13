@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   authenticateToast,
   publicBaseUrl,
@@ -11,6 +12,7 @@ import {
 
 /* ---------- Connect / save credentials ---------- */
 export const connectToast = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       projectId: z.string().min(1),
@@ -54,6 +56,7 @@ export const connectToast = createServerFn({ method: "POST" })
 
 /* ---------- Connection status ---------- */
 export const getToastStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: conn } = await supabaseAdmin
@@ -116,6 +119,7 @@ export const getToastStatus = createServerFn({ method: "POST" })
 
 /* ---------- Disconnect ---------- */
 export const disconnectToast = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { error } = await supabaseAdmin
@@ -128,6 +132,7 @@ export const disconnectToast = createServerFn({ method: "POST" })
 
 /* ---------- Sync Toast menu into mapping table ---------- */
 export const syncToastMenu = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: conn } = await supabaseAdmin
@@ -208,6 +213,7 @@ export const syncToastMenu = createServerFn({ method: "POST" })
 
 /* ---------- List menu mappings ---------- */
 export const listToastMenuMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: rows, error } = await supabaseAdmin
@@ -221,6 +227,7 @@ export const listToastMenuMap = createServerFn({ method: "POST" })
 
 /* ---------- Update one mapping row ---------- */
 export const updateToastMenuMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       id: z.string().uuid(),
@@ -241,6 +248,7 @@ export const updateToastMenuMap = createServerFn({ method: "POST" })
 
 /* ---------- Recent Toast orders ---------- */
 export const listRecentToastOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       projectId: z.string().min(1),

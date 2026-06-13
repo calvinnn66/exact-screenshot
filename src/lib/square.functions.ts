@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   REQUIRED_SCOPES,
   REDIRECT_PATH,
@@ -13,6 +14,7 @@ import {
 
 /* ---------- Build the OAuth authorize URL ---------- */
 export const getSquareAuthUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       projectId: z.string().min(1),
@@ -38,6 +40,7 @@ export const getSquareAuthUrl = createServerFn({ method: "POST" })
 
 /* ---------- Connection status ---------- */
 export const getSquareStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: conn } = await supabaseAdmin
@@ -99,6 +102,7 @@ export const getSquareStatus = createServerFn({ method: "POST" })
 
 /* ---------- Disconnect ---------- */
 export const disconnectSquare = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { error } = await supabaseAdmin
@@ -111,6 +115,7 @@ export const disconnectSquare = createServerFn({ method: "POST" })
 
 /* ---------- Sync Square catalog into mapping table ---------- */
 export const syncSquareCatalog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: conn } = await supabaseAdmin
@@ -172,6 +177,7 @@ export const syncSquareCatalog = createServerFn({ method: "POST" })
 
 /* ---------- List catalog map ---------- */
 export const listCatalogMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ projectId: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
     const { data: rows, error } = await supabaseAdmin
@@ -185,6 +191,7 @@ export const listCatalogMap = createServerFn({ method: "POST" })
 
 /* ---------- Update one mapping row ---------- */
 export const updateCatalogMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       id: z.string().uuid(),
@@ -205,6 +212,7 @@ export const updateCatalogMap = createServerFn({ method: "POST" })
 
 /* ---------- Recent orders feed ---------- */
 export const listRecentOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
     z.object({
       projectId: z.string().min(1),
