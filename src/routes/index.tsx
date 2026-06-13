@@ -483,6 +483,8 @@ function KitchenIntel() {
   const [view, setView] = useState<"launch" | "picker" | "app">("launch");
   const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedProjectsRef = useRef<Project[]>([]);
 
   // Supabase auth: restore session on mount and react to sign-in / sign-out
   useEffect(() => {
@@ -504,18 +506,43 @@ function KitchenIntel() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load projects only after we know whether the user is authenticated
+  // Load projects (Supabase-first, localStorage fallback) after auth is confirmed
   useEffect(() => {
     if (!authChecked || !authUser) return;
-    const s = loadProjects();
-    setStore(s);
-    if (s.sawWelcome && s.activeProjectId && s.projects.some(p => p.id === s.activeProjectId)) setView("app");
-    else if (s.sawWelcome) setView("picker");
-    else setView("launch");
-    setHydrated(true);
+    (async () => {
+      const s = await loadProjects(authUser.id);
+      lastSyncedProjectsRef.current = s.projects;
+      setStore(s);
+      if (s.sawWelcome && s.activeProjectId && s.projects.some(p => p.id === s.activeProjectId)) setView("app");
+      else if (s.sawWelcome) setView("picker");
+      else setView("launch");
+      setHydrated(true);
+    })();
   }, [authChecked, authUser?.id]);
 
-  useEffect(() => { if (hydrated) saveProjects(store); }, [hydrated, store]);
+  // Write-through: sync localStorage immediately, debounce Supabase upsert
+  useEffect(() => {
+    if (!hydrated) return;
+    saveProjects(store);
+    if (!authUser) return;
+    const snapshot = store.projects;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      const prev = lastSyncedProjectsRef.current;
+      for (const pp of prev) {
+        if (!snapshot.find(p => p.id === pp.id)) {
+          deleteProjectFromDb(pp.id).catch(() => {});
+        }
+      }
+      for (const p of snapshot) {
+        const existing = prev.find(pp => pp.id === p.id);
+        if (!existing || JSON.stringify(existing) !== JSON.stringify(p)) {
+          upsertProject(p.id, authUser.id, p.name, p.type ?? null, p.state).catch(() => {});
+        }
+      }
+      lastSyncedProjectsRef.current = snapshot;
+    }, 800);
+  }, [hydrated, store]);
 
   const startApp = () => { setStore(s => ({ ...s, sawWelcome: true })); setView("picker"); };
   const openProject = (id: string) => {
@@ -691,13 +718,13 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
         state.locations = [loc]; state.activeLocationId = loc.id;
       }
     }
-    const proj: Project = { id: uid("prj"), name: name.trim(), type: rtype, createdAt: Date.now(), lastOpened: Date.now(), state };
+    const proj: Project = { id: newProjectId(), name: name.trim(), type: rtype, createdAt: Date.now(), lastOpened: Date.now(), state };
     onCreate(proj);
     onOpen(proj.id);
   };
 
   const duplicate = (p: Project) => {
-    const copy: Project = { ...p, id: uid("prj"), name: `${p.name} (Copy)`, createdAt: Date.now(), lastOpened: Date.now(),
+    const copy: Project = { ...p, id: newProjectId(), name: `${p.name} (Copy)`, createdAt: Date.now(), lastOpened: Date.now(),
       state: JSON.parse(JSON.stringify(p.state)) };
     onCreate(copy);
   };
