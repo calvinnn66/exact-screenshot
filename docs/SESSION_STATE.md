@@ -4,94 +4,147 @@ _Updated: 2026-06-14 · Branch: `clawbot-dev`_
 
 ---
 
-## What works end-to-end
+## Branch
 
-| Feature | Status |
-|---|---|
-| Auth (login / signup / logout / session persistence) | Working |
-| Multi-project store (localStorage + Supabase write-through) | Working |
-| One-time localStorage → Supabase UUID migration | Working |
-| Toast POS status derived from `getToastStatus()` | Working (Step 3A) |
-| Live POS feed polling (`getLivePosFeed` every 8 s) | Working (no-op locally without service role key) |
-| AI scanner (Gemini 2.5 Flash via Lovable AI Gateway) | Working |
-| Square OAuth + webhooks | Working |
-| Toast webhook receiver + `pos_orders` upsert | Working |
+`clawbot-dev` → target merge: `main`
 
 ---
 
-## Recent commits
+## Latest commits
 
 | Hash | Description |
 |---|---|
-| `afec3e0` | feat(toast): derive toast status from getToastStatus |
+| `4298c21` | docs: add SESSION_STATE.md (previous draft) |
+| `afec3e0` | feat(toast): derive toast status from getToastStatus **(Step 3A)** |
 | `fb9fdc7` | docs: add PERSISTENCE.md |
 | `85c4df1` | feat(persistence): wire Supabase write-through sync |
 | `3f494e9` | feat(persistence): async loadProjects with Supabase-first + one-time localStorage import |
 | `63ddbe2` | feat(persistence): add projects-db.ts — browser-side Supabase CRUD |
-| `f5fa21b` | feat(db): add projects and project_state tables (Supabase migration) |
+| `f5fa21b` | feat(db): add projects and project_state tables |
+| `49d3aa9` | feat(auth): wire Supabase Auth — login, signup, logout, session persistence |
 
 ---
 
-## Completed checkpoints (this session)
+## Completed P1 work
 
-### Step 2 — Database Persistence
+### Auth
+- Login / signup / logout via Supabase Auth
+- Session persistence across page reloads (Supabase session listener)
+- `authUser` and `authChecked` state in `KitchenIntel` root component
 
-- `supabase/migrations/20260613120000_add_projects_persistence.sql` — applied to live Supabase project
-- `src/lib/projects-db.ts` — `fetchUserProjects`, `upsertProject`, `deleteProjectFromDb` (browser anon key, RLS-scoped)
-- `src/integrations/supabase/types.ts` — `projects` + `project_state` table types added
-- `src/routes/index.tsx` — `readLocalStore` + async `loadProjects(userId)`, `lastSyncedProjectsRef`, 800 ms debounced write-through, `newProjectId()` → `crypto.randomUUID()` at all 3 project-creation sites
-- `docs/PERSISTENCE.md` — architecture doc committed
+### Database Persistence (Step 2)
+- **Migration applied** to live Supabase project: `supabase/migrations/20260613120000_add_projects_persistence.sql`
+  - `public.projects` — one row per restaurant workspace, owned by `auth.users.id`
+  - `public.project_state` — serialized `Persist` JSONB blob, 1:1 with `projects`
+  - RLS: `auth.uid()` policies on both tables (anon key is sufficient — no service role key needed)
+  - `touch_updated_at()` triggers and `idx_projects_user` index
+- `src/lib/projects-db.ts` — browser Supabase CRUD (`fetchUserProjects`, `upsertProject`, `deleteProjectFromDb`)
+- `src/integrations/supabase/types.ts` — `projects` + `project_state` types added
+- `src/routes/index.tsx` changes:
+  - `readLocalStore()` — synchronous localStorage read with legacy migration
+  - `loadProjects(userId)` — async, Supabase-first with one-time localStorage → Supabase import
+  - `lastSyncedProjectsRef` — seeded on load to prevent spurious initial upsert
+  - 800 ms debounced write-through: diffs `store.projects` against ref, upserts changed, deletes removed
+  - `newProjectId()` → `crypto.randomUUID()` at all 3 project-creation sites (replaces `uid("prj")`)
 
-### Step 3A — Remove fake Toast connected state
-
-- `INTEGRATIONS_SEED` Toast entry: `status` changed from `"connected"` to `"available"`, fake `lastSync`/`records` fields removed
-- `Shell` component: `useServerFn(getToastStatus)` wired; on mount it fetches real connection status and updates `integrations` state; expires_at check for `"error"` status
-- Commit: `feat(toast): derive toast status from getToastStatus`
+### Toast Integration — Step 3A
+- `INTEGRATIONS_SEED` Toast entry: `status` changed `"connected"` → `"available"`; fake `lastSync` / `records` fields removed
+- `Shell` component: `useServerFn(getToastStatus)` called on mount (when `app.projectId` is set)
+  - Sets Toast status to `"connected"`, `"error"` (expired token), or `"available"` from real DB data
+  - Falls back silently if service role key absent or network error
 
 ---
 
-## Pending: Step 3B — Wire Sync Status card to real data
+## Supabase status
 
-**Approved plan, not yet applied.** Five targeted edits to `src/routes/index.tsx`:
+| Item | Status |
+|---|---|
+| Migration `20260613120000` | Applied and verified in live project |
+| RLS on `projects` + `project_state` | Active |
+| Supabase project ID | `muklqaivygnxpubkphbx` |
+| Service role key (local dev) | Not required for project CRUD; required for POS server functions |
 
-1. **`formatAgo` helper** — convert ISO timestamp to "Xs ago / Xm ago / Xh ago"; add after `const newProjectId = ...`
-2. **`toastStatusData` state** in `Shell` — typed state holding full `getToastStatus` response
-3. **Store response** — add `setToastStatusData(res)` inside existing `getToastStatus` useEffect
+---
+
+## Current Toast integration status
+
+| Signal | Source |
+|---|---|
+| Badge (connected / available / error) | `getToastStatus()` → `toast_connections` table |
+| Sync Status card — Source | **Hardcoded** ("Toast POS" always) |
+| Sync Status card — Last sync | **Hardcoded** ("2 min ago") |
+| Sync Status card — Records/day | **Hardcoded** ("1,284") |
+| Sync Status card — Errors (24h) | **Hardcoded** ("None") |
+
+Step 3B will replace all four hardcoded values with live data from `getToastStatus()`.
+
+---
+
+## Step 3B — approved plan, not yet applied
+
+Five targeted edits to `src/routes/index.tsx`:
+
+1. **`formatAgo` helper** — after `const newProjectId = ...`
+   ```typescript
+   function formatAgo(iso: string | null): string {
+     if (!iso) return "—";
+     const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+     if (s < 60) return `${s}s ago`;
+     if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+     return `${Math.floor(s / 3600)}h ago`;
+   }
+   ```
+
+2. **`toastStatusData` state** in `Shell`
+   ```typescript
+   const [toastStatusData, setToastStatusData] = useState<{
+     connection: { expires_at: string } | null;
+     webhookCount: number;
+     webhookErrors: number;
+     lastEventAt: string | null;
+     orders24h: number;
+   } | null>(null);
+   ```
+
+3. **Store full response** — add `setToastStatusData(res)` inside existing `getToastStatus` useEffect
+
 4. **Prop passthrough** — add `toastStatusData={toastStatusData}` to `<Integrations>` render
-5. **Sync Status card** — replace 4 hardcoded stat divs with live values: Source, Last sync (formatted), Orders 24h, Errors 24h (colored red if > 0)
+
+5. **Sync Status card** — replace 4 hardcoded stat divs with live values (Source, Last sync, Orders 24h, Errors 24h colored red if > 0)
 
 ---
 
-## Remaining Step 3 items (not yet started)
+## Remaining Step 3 items
 
 | Step | Description |
 |---|---|
-| 3C | Replace hardcoded `https://api.kitchenintel.io/v1/hooks` with `window.location.origin + "/api/public/toast/webhook"` in Settings |
-| 3D | Show "Token expired — reconnect" prompt in ToastPanel when `expires_at` is past |
+| **3B** (next) | Wire Sync Status card to real `getToastStatus()` — approved, ready to apply |
+| 3C | Replace hardcoded webhook URL `https://api.kitchenintel.io/v1/hooks` with `window.location.origin + "/api/public/toast/webhook"` in Settings |
+| 3D | Show "Token expired — reconnect" prompt in ToastPanel when `connection.expires_at` is in the past |
 
 ---
 
-## After Step 3 — backlog order
+## Remaining P1 roadmap
 
 | Priority | Item |
 |---|---|
-| Step 4 | Location/project separation: filter `getLivePosFeed` by `location_id` |
+| Step 4 | Location / project separation: filter `getLivePosFeed` by `location_id` |
 | Step 5 | Surface webhook errors: consecutive-failure counter in Toast panel |
-| P1 CRUD | Item edit modal, Add Item dialog, recipe edit, replace `window.prompt`/`window.confirm` |
+| P1 CRUD | Item edit modal, Add Item dialog, recipe edit — replace all `window.prompt` / `window.confirm` |
 
 ---
 
-## Known technical debt
+## Known technical debt / risks
 
-- `toast_connections`, `square_connections`, `pos_orders` still use `project_id TEXT` (pre-migration `prj_abc1234`-style IDs). These columns will need UUID FK migration when project IDs are used as FK references in POS queries.
-- No conflict resolution: last write wins if two browser tabs are open as the same user.
-- `getToastStatus` useEffect in `Shell` fires once on mount. It does not re-poll; a stale connection state persists until page reload.
+| Item | Risk |
+|---|---|
+| `toast_connections`, `square_connections`, `pos_orders` use `project_id TEXT` (old `prj_abc1234` format) | FK integrity not enforced; will need UUID migration before Step 4 |
+| No conflict resolution in write-through | Last write wins if two browser tabs open as same user |
+| `getToastStatus` fires once on mount only | Stale connection badge persists until page reload |
+| `*.client.*` filenames blocked by TanStack Start SSR import-protection | Any new browser-only Supabase helpers must be named `*-db.ts` or similar — never `*.client.ts` |
 
 ---
 
-## Critical architecture notes
+## Exact next recommended task
 
-- `*.client.*` filenames are blocked from SSR route imports by TanStack Start's `import-protection` plugin. Name browser-only Supabase helpers `*-db.ts` or similar — never `*.client.ts`.
-- `src/lib/projects-db.ts` uses the browser anon key + RLS. No service role key required for project CRUD.
-- `touch_updated_at()` trigger must exist in the database before the projects migration runs (it is created by migration 1).
-- `lastSyncedProjectsRef` is seeded immediately after `loadProjects` returns to prevent a spurious upsert on the first render.
+**Apply Step 3B** — 5 targeted edits to `src/routes/index.tsx`, already approved. Run `bun build:dev`, commit as `feat(toast): wire Sync Status card to real getToastStatus data`, push.
