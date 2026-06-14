@@ -5,6 +5,7 @@ import { scanImage } from "@/lib/scan.functions";
 import { ToastPanel } from "@/components/ToastPanel";
 import { SquarePanel } from "@/components/SquarePanel";
 import { getLivePosFeed } from "@/lib/pos.functions";
+import { getToastStatus } from "@/lib/toast.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchUserProjects, upsertProject, deleteProjectFromDb } from "@/lib/projects-db";
 
@@ -163,7 +164,7 @@ const DEFAULT_MENU: MenuItem[] = [
 ];
 
 const INTEGRATIONS_SEED: Integration[] = [
-  { id: "toast",      name: "Toast POS",      category: "POS",        status: "connected", lastSync: "live", records: 1284, implemented: true },
+  { id: "toast",      name: "Toast POS",      category: "POS",        status: "available", implemented: true },
   { id: "square",     name: "Square",         category: "POS",        status: "available", implemented: true },
   { id: "clover",     name: "Clover",         category: "POS",        status: "available" },
   { id: "lightspeed", name: "Lightspeed",     category: "POS",        status: "available" },
@@ -940,7 +941,26 @@ function Shell({ hydrated }: { hydrated: boolean }) {
 
   // Real POS feed (Toast + Square) → recipe-driven deduction + sales feed
   const livePosFn = useServerFn(getLivePosFeed);
+  const toastStatusFn = useServerFn(getToastStatus);
   const processedRef = useRef<Set<string>>(new Set());
+
+  // Fetch real Toast connection status on mount and when project changes
+  useEffect(() => {
+    if (!app.projectId) return;
+    (async () => {
+      try {
+        const res = await toastStatusFn({ data: { projectId: app.projectId } });
+        setIntegrations(prev => prev.map(ig => {
+          if (ig.id !== "toast") return ig;
+          const connected = !!res.connection;
+          const expired = connected && new Date((res.connection as any).expires_at) < new Date();
+          return { ...ig, status: expired ? "error" : connected ? "connected" : "available" };
+        }));
+      } catch {
+        // Service role key absent locally or network error — leave as "available"
+      }
+    })();
+  }, [app.projectId]);
   useEffect(() => {
     if (!posLive) return;
     const projectId = app.projectId;
