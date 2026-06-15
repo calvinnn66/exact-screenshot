@@ -141,10 +141,13 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
   };
 
   const connected = !!status?.connection;
+  const tokenExpired = !!status?.connection?.expires_at && new Date(status.connection.expires_at) < new Date();
+
   const tokenExpiresIn = useMemo(() => {
     if (!status?.connection?.expires_at) return null;
     const mins = (new Date(status.connection.expires_at).getTime() - Date.now()) / 60000;
-    if (mins < 60) return `${Math.max(0, Math.round(mins))}m`;
+    if (mins <= 0) return "Expired";
+    if (mins < 60) return `${Math.round(mins)}m`;
     return `${Math.round(mins / 60)}h`;
   }, [status]);
 
@@ -200,6 +203,14 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
       )}
 
       <div style={css.body}>
+        {connected && tokenExpired && (
+          <div style={{ padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#991B1B", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span>Token expired — your Toast credentials need to be renewed to resume syncing.</span>
+            <button style={css.btnGhost} onClick={disconnect} disabled={busy === "disconnect"}>
+              {busy === "disconnect" ? "Disconnecting…" : "Reconnect"}
+            </button>
+          </div>
+        )}
         {!connected ? (
           <form onSubmit={submitConnect} style={{ display: "grid", gap: 12 }}>
             <div style={css.kv}>
