@@ -903,6 +903,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [posLive, setPosLive] = useState(true);
   const [integrations, setIntegrations] = useState<Integration[]>(INTEGRATIONS_SEED);
+  const [toastWebhookUrl, setToastWebhookUrl] = useState("");
   const [now, setNow] = useState(new Date());
   const isMobile = useIsMobile();
 
@@ -956,6 +957,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           const expired = connected && new Date((res.connection as any).expires_at) < new Date();
           return { ...ig, status: expired ? "error" : connected ? "connected" : "available" };
         }));
+        setToastWebhookUrl(res.webhookUrl || "");
       } catch {
         // Service role key absent locally or network error — leave as "available"
       }
@@ -1109,7 +1111,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "reports"      && <Reports/>}
           {tab === "deliveries"   && <Deliveries/>}
           {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive}/>}
-          {tab === "settings"     && <Settings/>}
+          {tab === "settings"     && <Settings webhookUrl={toastWebhookUrl}/>}
         </main>
 
         {isMobile && <MobileTabBar tab={tab} setTab={setTab}/>}
@@ -2140,7 +2142,7 @@ const kvValue: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginTop:
 /* ============================================================
    SETTINGS — full admin
    ============================================================ */
-function Settings() {
+function Settings({ webhookUrl }: { webhookUrl: string }) {
   const app = useApp();
   return (
     <div>
@@ -2152,7 +2154,7 @@ function Settings() {
         </Card>
         <Card title="API & Webhooks">
           <Field label="API Key" value={"ki_live_••••••••3f8a"} onChange={() => {}}/>
-          <Field label="Webhook URL" value={"https://api.kitchenintel.io/v1/hooks"} onChange={() => {}}/>
+          <Field label="Webhook URL" value={webhookUrl || `${window.location.origin}/api/public/toast/webhook`} onChange={() => {}}/>
           <Pill tone="ok">{Icon.dot(ui.ok)} 4 webhooks active</Pill>
         </Card>
       </Grid>
