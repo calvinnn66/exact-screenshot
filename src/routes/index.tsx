@@ -179,6 +179,15 @@ const INTEGRATIONS_SEED: Integration[] = [
    ============================================================ */
 const uid = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 const newProjectId = () => crypto.randomUUID();
+
+function formatAgo(iso: string | null): string {
+  if (!iso) return "—";
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+}
+
 const LS_LEGACY = "ki_state_v1";
 const LS_PROJECTS = "ki_projects_v1";
 
@@ -904,6 +913,13 @@ function Shell({ hydrated }: { hydrated: boolean }) {
   const [posLive, setPosLive] = useState(true);
   const [integrations, setIntegrations] = useState<Integration[]>(INTEGRATIONS_SEED);
   const [toastWebhookUrl, setToastWebhookUrl] = useState("");
+  const [toastStatusData, setToastStatusData] = useState<{
+    connection: { expires_at: string } | null;
+    webhookCount: number;
+    webhookErrors: number;
+    lastEventAt: string | null;
+    orders24h: number;
+  } | null>(null);
   const [now, setNow] = useState(new Date());
   const isMobile = useIsMobile();
 
@@ -958,6 +974,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           return { ...ig, status: expired ? "error" : connected ? "connected" : "available" };
         }));
         setToastWebhookUrl(res.webhookUrl || "");
+        setToastStatusData(res);
       } catch {
         // Service role key absent locally or network error — leave as "available"
       }
@@ -1110,7 +1127,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "forecast"     && <Forecast/>}
           {tab === "reports"      && <Reports/>}
           {tab === "deliveries"   && <Deliveries/>}
-          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive}/>}
+          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive} toastStatusData={toastStatusData}/>}
           {tab === "settings"     && <Settings webhookUrl={toastWebhookUrl}/>}
         </main>
 
@@ -2064,7 +2081,7 @@ function Deliveries() {
   );
 }
 
-function Integrations({ integrations, setIntegrations, posLive, setPosLive }: any) {
+function Integrations({ integrations, setIntegrations, posLive, setPosLive, toastStatusData }: any) {
   const { menu, projectId } = useApp();
   const menuSkus = menu.map((m: any) => ({ sku: m.id, name: m.name }));
   return (
@@ -2078,10 +2095,10 @@ function Integrations({ integrations, setIntegrations, posLive, setPosLive }: an
 
       <Card title="POS Sync Status" action={<Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} {posLive ? "Simulator Live" : "Simulator Paused"}</Pill>} style={{ marginBottom: 16 }}>
         <Grid cols="repeat(auto-fit, minmax(160px, 1fr))" gap={10}>
-          <div><div style={kvLabel}>Simulator</div><div style={kvValue}>Demo POS</div></div>
-          <div><div style={kvLabel}>Last sync</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>8s ago</div></div>
-          <div><div style={kvLabel}>Records / day</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>1,284</div></div>
-          <div><div style={kvLabel}>Webhook latency</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>p95 · 142ms</div></div>
+          <div><div style={kvLabel}>Source</div><div style={kvValue}>{toastStatusData?.connection ? "Toast POS" : "—"}</div></div>
+          <div><div style={kvLabel}>Last sync</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>{formatAgo(toastStatusData?.lastEventAt ?? null)}</div></div>
+          <div><div style={kvLabel}>Orders 24h</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14 }}>{toastStatusData ? toastStatusData.orders24h : "—"}</div></div>
+          <div><div style={kvLabel}>Errors 24h</div><div style={{ ...kvValue, ...ui.mono, fontSize: 14, color: (toastStatusData?.webhookErrors ?? 0) > 0 ? ui.bad : undefined }}>{toastStatusData ? (toastStatusData.webhookErrors > 0 ? toastStatusData.webhookErrors : "None") : "—"}</div></div>
           <div style={{ display: "flex", alignItems: "flex-end" }}><Btn size="sm" onClick={() => setPosLive((v: boolean) => !v)}>{posLive ? "Pause" : "Resume"}</Btn></div>
         </Grid>
       </Card>
