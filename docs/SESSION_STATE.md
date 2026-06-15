@@ -1,6 +1,6 @@
 # KitchenIntel — Session State Handoff
 
-_Updated: 2026-06-14 · Branch: `clawbot-dev`_
+_Updated: 2026-06-15 · Branch: `clawbot-dev`_
 
 ---
 
@@ -14,13 +14,13 @@ _Updated: 2026-06-14 · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
-| `4298c21` | docs: add SESSION_STATE.md (previous draft) |
-| `afec3e0` | feat(toast): derive toast status from getToastStatus **(Step 3A)** |
+| `8c29b84` | feat(db): add idx_pos_orders_location — Step 4 Phase 1 **(current)** |
+| `d5c3535` | feat(toast): token-expired banner with reconnect prompt (Step 3D) |
+| `d516e36` | feat(toast): wire Sync Status card to real getToastStatus data (Step 3B) |
+| `74ca79a` | feat(toast): wire real webhook URL from getToastStatus into Settings (Step 3C) |
+| `afec3e0` | feat(toast): derive toast status from getToastStatus (Step 3A) |
 | `fb9fdc7` | docs: add PERSISTENCE.md |
 | `85c4df1` | feat(persistence): wire Supabase write-through sync |
-| `3f494e9` | feat(persistence): async loadProjects with Supabase-first + one-time localStorage import |
-| `63ddbe2` | feat(persistence): add projects-db.ts — browser-side Supabase CRUD |
-| `f5fa21b` | feat(db): add projects and project_state tables |
 | `49d3aa9` | feat(auth): wire Supabase Auth — login, signup, logout, session persistence |
 
 ---
@@ -47,11 +47,16 @@ _Updated: 2026-06-14 · Branch: `clawbot-dev`_
   - 800 ms debounced write-through: diffs `store.projects` against ref, upserts changed, deletes removed
   - `newProjectId()` → `crypto.randomUUID()` at all 3 project-creation sites (replaces `uid("prj")`)
 
-### Toast Integration — Step 3A
-- `INTEGRATIONS_SEED` Toast entry: `status` changed `"connected"` → `"available"`; fake `lastSync` / `records` fields removed
-- `Shell` component: `useServerFn(getToastStatus)` called on mount (when `app.projectId` is set)
-  - Sets Toast status to `"connected"`, `"error"` (expired token), or `"available"` from real DB data
-  - Falls back silently if service role key absent or network error
+### Toast Integration — Steps 3A–3D ✓
+- **3A**: `INTEGRATIONS_SEED` seed corrected; `Shell` calls `getToastStatus()` on mount to set real badge status (connected / error / available)
+- **3B**: `formatAgo` helper; `toastStatusData` state in `Shell`; POS Sync Status card wired to live Source / Last sync / Orders 24h / Errors 24h
+- **3C**: Settings webhook URL field replaced: reads `res.webhookUrl` from `getToastStatus()`; falls back to `window.location.origin + "/api/public/toast/webhook"`
+- **3D**: `ToastPanel`: `tokenExpired` boolean + red banner with Reconnect button when `expires_at` is past; `tokenExpiresIn` now returns `"Expired"` instead of `"0m"`
+
+### Location / Project Separation — Step 4 Phase 1 ✓
+- **Migration applied** (pending apply to live Supabase): `supabase/migrations/20260615000000_add_pos_orders_location_idx.sql`
+  - `CREATE INDEX IF NOT EXISTS idx_pos_orders_location ON public.pos_orders(project_id, location_id, ordered_at DESC)`
+  - Prerequisite for Phase 2: without this index, a `location_id` filter on `pos_orders` causes a heap re-scan of all project rows via the existing `pos_orders_project_idx`
 
 ---
 
@@ -60,67 +65,45 @@ _Updated: 2026-06-14 · Branch: `clawbot-dev`_
 | Item | Status |
 |---|---|
 | Migration `20260613120000` | Applied and verified in live project |
+| Migration `20260615000000` | **Committed — must be applied to live Supabase before Phase 2** |
 | RLS on `projects` + `project_state` | Active |
 | Supabase project ID | `muklqaivygnxpubkphbx` |
 | Service role key (local dev) | Not required for project CRUD; required for POS server functions |
 
 ---
 
-## Current Toast integration status
+## Step 4 — Location / Project Separation
 
-| Signal | Source |
-|---|---|
-| Badge (connected / available / error) | `getToastStatus()` → `toast_connections` table |
-| Sync Status card — Source | **Hardcoded** ("Toast POS" always) |
-| Sync Status card — Last sync | **Hardcoded** ("2 min ago") |
-| Sync Status card — Records/day | **Hardcoded** ("1,284") |
-| Sync Status card — Errors (24h) | **Hardcoded** ("None") |
+### Architecture gap (established in audit)
 
-Step 3B will replace all four hardcoded values with live data from `getToastStatus()`.
+Two separate "location" concepts that never intersect:
 
----
+| | Client locations (`Persist.locations[]`) | POS location IDs (`pos_orders.location_id`) |
+|---|---|---|
+| ID format | `"loc_abc1234"` (`uid("loc")`) | `"restaurant-guid-xyz"` or `"LXYZ789"` |
+| Created by | User in Settings UI | Square OAuth / Toast credential flow |
+| Stored in | localStorage + Supabase JSONB blob | `pos_orders.location_id` column |
+| Used to filter orders | Never | Not yet |
 
-## Step 3B — approved plan, not yet applied
+`activeLocationId` from `Persist` is a client-side string with no link to any POS identifier. It **cannot** be passed directly to `getLivePosFeed` as a DB filter.
 
-Five targeted edits to `src/routes/index.tsx`:
+### Phase completion status
 
-1. **`formatAgo` helper** — after `const newProjectId = ...`
-   ```typescript
-   function formatAgo(iso: string | null): string {
-     if (!iso) return "—";
-     const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-     if (s < 60) return `${s}s ago`;
-     if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-     return `${Math.floor(s / 3600)}h ago`;
-   }
-   ```
+| Phase | Description | Status |
+|---|---|---|
+| **Phase 1** | DB index: `idx_pos_orders_location` on `pos_orders(project_id, location_id, ordered_at DESC)` | ✓ Committed `8c29b84` — apply migration to live DB |
+| **Phase 2** | Server: add optional `locationId?: string` param to `getLivePosFeed`; `.eq("location_id", ...)` when set | Next |
+| **Phase 3** | Client type: add `posLocationId?: string` to `Location` type in `Persist` | Pending Phase 2 |
+| **Phase 4** | Wire POS location ID into active `Location` via `getToastStatus` useEffect response | Pending Phase 3 |
+| **Phase 5** | Thread `posLocationId` from active location into `livePosFn` call | Pending Phase 4 |
 
-2. **`toastStatusData` state** in `Shell`
-   ```typescript
-   const [toastStatusData, setToastStatusData] = useState<{
-     connection: { expires_at: string } | null;
-     webhookCount: number;
-     webhookErrors: number;
-     lastEventAt: string | null;
-     orders24h: number;
-   } | null>(null);
-   ```
+### Phase 2 implementation plan (approved at audit, ready to apply after migration is live)
 
-3. **Store full response** — add `setToastStatusData(res)` inside existing `getToastStatus` useEffect
+Single edit to `src/lib/pos.functions.ts`:
 
-4. **Prop passthrough** — add `toastStatusData={toastStatusData}` to `<Integrations>` render
-
-5. **Sync Status card** — replace 4 hardcoded stat divs with live values (Source, Last sync, Orders 24h, Errors 24h colored red if > 0)
-
----
-
-## Remaining Step 3 items
-
-| Step | Description |
-|---|---|
-| **3B** (next) | Wire Sync Status card to real `getToastStatus()` — approved, ready to apply |
-| 3C | Replace hardcoded webhook URL `https://api.kitchenintel.io/v1/hooks` with `window.location.origin + "/api/public/toast/webhook"` in Settings |
-| 3D | Show "Token expired — reconnect" prompt in ToastPanel when `connection.expires_at` is in the past |
+1. Input schema: add `locationId: z.string().optional()`
+2. After `.eq("project_id", data.projectId)`: add conditional `.eq("location_id", data.locationId)` when `data.locationId` is set and non-empty
+3. Backward compatible: omitting `locationId` preserves current all-project behavior
 
 ---
 
@@ -128,7 +111,7 @@ Five targeted edits to `src/routes/index.tsx`:
 
 | Priority | Item |
 |---|---|
-| Step 4 | Location / project separation: filter `getLivePosFeed` by `location_id` |
+| Step 4 Phases 2–5 | Location filter wired end-to-end (server fn → client type → POS ID link → feed call) |
 | Step 5 | Surface webhook errors: consecutive-failure counter in Toast panel |
 | P1 CRUD | Item edit modal, Add Item dialog, recipe edit — replace all `window.prompt` / `window.confirm` |
 
@@ -138,13 +121,14 @@ Five targeted edits to `src/routes/index.tsx`:
 
 | Item | Risk |
 |---|---|
-| `toast_connections`, `square_connections`, `pos_orders` use `project_id TEXT` (old `prj_abc1234` format) | FK integrity not enforced; will need UUID migration before Step 4 |
+| `toast_connections`, `square_connections`, `pos_orders` use `project_id TEXT` (old `prj_abc1234` format) | FK integrity not enforced; will need UUID migration before location filter can be fully trusted |
 | No conflict resolution in write-through | Last write wins if two browser tabs open as same user |
 | `getToastStatus` fires once on mount only | Stale connection badge persists until page reload |
 | `*.client.*` filenames blocked by TanStack Start SSR import-protection | Any new browser-only Supabase helpers must be named `*-db.ts` or similar — never `*.client.ts` |
+| `listRecentToastOrders` / `listRecentOrders` / `getToastStatus.orders24h` — no location filter | ToastPanel + SquarePanel order tabs and status counts still show project-wide data; defer to later step |
 
 ---
 
 ## Exact next recommended task
 
-**Apply Step 3B** — 5 targeted edits to `src/routes/index.tsx`, already approved. Run `bun build:dev`, commit as `feat(toast): wire Sync Status card to real getToastStatus data`, push.
+**Apply migration `20260615000000` to live Supabase**, then begin **Phase 2** — single edit to `src/lib/pos.functions.ts` adding optional `locationId` param to `getLivePosFeed`.
