@@ -1,6 +1,6 @@
 # KitchenIntel — Session State Handoff
 
-_Updated: 2026-06-16 (P2-B) · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 (P0 bug fixes) · Branch: `clawbot-dev`_
 
 ---
 
@@ -14,11 +14,11 @@ _Updated: 2026-06-16 (P2-B) · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
+| `cf974f9` | fix(p0): sales persistence, simulator guard, usage tracking, consecutiveErrors scope |
+| `f2fa01f` | docs: update SESSION_STATE.md — P2-B complete, all P2 done |
 | `c2951fd` | feat(recipes): add editable recipe ingredient UI (P2-B) |
 | `b69902e` | feat(pos): per-location order filtering in POS panels (P2-D) |
 | `76139c9` | feat(pos): poll getToastStatus every 15 s to keep badge fresh (P2-C) |
-| `a439c78` | feat(inventory): add full item CRUD modals (P2-A) |
-| `2ab4e0d` | docs: update SESSION_STATE.md — P2-A, P2-C, P2-D complete |
 
 ---
 
@@ -84,10 +84,37 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 - Pencil button on the card header opens the edit-meta modal
 
 ### P2-D — Per-location order filtering in POS panels ✓ (commit `b69902e`)
-- `listRecentToastOrders` and `listRecentOrders` both accept optional `locationId`; conditionally apply `.eq("location_id")` using the same `let query; if (locationId) query = query.eq(...)` pattern established in `pos.functions.ts`
+- `listRecentToastOrders` and `listRecentOrders` both accept optional `locationId`; conditionally apply `.eq("location_id")`
 - `ToastPanel` accepts `posLocationId` prop and passes it to the orders query; interval restarts when locationId changes
 - `SquarePanel` self-derives `locationId` from `status.connection.location_id` — no new prop required
 - `Integrations` derives `posLocationId` from the active location and threads it to `ToastPanel`
+
+---
+
+## Completed P0 audit fixes (commit `cf974f9`)
+
+### P0-1 — Sales persistence ✓
+- `sales: SalesRow[]` added to `Persist` type
+- `emptyPersist()` initialises `sales: []`
+- `ProjectWorkspace` initialises `sales` from `init.sales ?? []` (not `[]`)
+- Write-through `useEffect` includes `sales: sales.slice(0, 500)` in patch and `sales` in deps
+- Sales now survive page reloads
+
+### P0-2 — Simulator / real POS double-processing guard ✓
+- `realPosConnectedRef` (useRef) tracks whether Toast or Square is live
+- Updated by a `useEffect` that watches `toastStatusData?.connection` and new `squareConnected` state
+- Simulator interval tick returns early when `realPosConnectedRef.current === true`
+- `SquarePanel` gains `onConnectionChange?: (connected: boolean) => void` prop; calls it after every `getSquareStatus` refresh
+- Prop threaded: `Shell → Integrations (onSquareConnected) → SquarePanel (onConnectionChange)`
+
+### P0-3 — Inventory usage tracking ✓
+- Real POS feed tick now writes `usage[day] += qty_burned` alongside `current` deduction
+- `new Date().getDay()` index (0 = Sunday … 6 = Saturday)
+- Usage array is shallow-cloned (`[...p.usage]`) before mutation so React detects the change
+
+### P0-4 — `consecutiveErrors` scope ✓
+- Moved `let consecutiveErrors = 0` from inside the `if (conn)` block to alongside `webhookCount`/`webhookErrors`
+- `getToastStatus` return value is now always `{ ..., consecutiveErrors: number }` — never `undefined`
 
 ---
 
@@ -111,14 +138,32 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 | No conflict resolution in write-through | Last write wins if two browser tabs open as same user |
 | `getToastStatus.orders24h` | Still project-wide (not per-location filtered) |
 | `*.client.*` filenames blocked by TanStack Start SSR | New browser-only Supabase helpers must be named `*-db.ts` |
+| Simulator updates `current` but not `usage[]` | Only real POS feed now tracks usage; simulator deductions remain untracked |
 
 ---
 
-## Post-P2 roadmap
+## Open P1 issues (from audit, not yet fixed)
 
-All P2 items are complete. Suggested next priorities:
+| # | Issue | Effort |
+|---|---|---|
+| P1-A | Dashboard AI insights — all three cards are hardcoded strings | M |
+| P1-B | Forecast header stats — 312 covers, +12% weather, +24% event are hardcoded | S |
+| P1-C | Reports stats — Waste 2.4%, COGS 28.2%, Labor 22.8%, Prep Accuracy 94%, labor chart static | M |
+| P1-D | Export CSV for Inventory (button is inert) | S |
+| P1-E | Print Prep List (button is inert) | S |
+| P1-F | Send to Stations (button is inert) | S |
+| P1-G | Prep List checkbox state resets on tab switch | S |
+| P1-H | Settings API Key is fake (`ki_live_••••••••3f8a`) | XS |
+| P1-I | "4 webhooks active" badge in Settings is hardcoded | XS |
+| P1-J | Hide Deliveries nav tab or show "Coming Soon" overlay | XS |
+| P1-K | Remove duplicate Menu Item Mapping table from Integrations view | XS |
+
+---
+
+## Post-P0 roadmap
 
 | Priority | Item | Scope |
 |---|---|---|
 | P3-A | **PR to main** — review and merge `clawbot-dev` into `main` | Git only |
 | P3-B | **`pos_orders.project_id` UUID migration** — align project_id column type with `crypto.randomUUID()` format | Migration + backfill |
+| P3-C | **P1 polish pass** — work through P1-A … P1-K in priority order | UI only |

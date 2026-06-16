@@ -1,34 +1,37 @@
 # KitchenIntel — Developer Handoff
 
-_Created: 2026-06-11 · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 · Branch: `clawbot-dev`_
 
 ---
 
 ## Current Branch
 
 ```
-clawbot-dev  (ahead of main, not yet merged)
+clawbot-dev  →  target merge: main
 ```
 
 The Lovable project is connected to `calvinnn66/exact-screenshot` on GitHub.
-Do not merge `clawbot-dev` → `main` without review.
+Do not merge `clawbot-dev` → `main` without a review pass on the open P1 items.
 
 ---
 
-## Recent Commits
+## Latest Commit
 
 ```
-da4d61c fix(P0-4): make POS live badges conditional on actual data flow
-bcaf6f4 fix(P0-3): remove fake Connect button for unimplemented integrations
-90142e1 fix(P0-2): replace Math.random() minutes with real timestamp in sales feed
-bfca90d fix(P0-1): read projectId from app context instead of hardcoding
-133b313 Fix local dev setup: gitignore .env, add admin guard, document Lovable Cloud backend
-67b3a86 Add CLAUDE.md with architecture docs and dev rules
-bf54d5f Made mobile-first layout fixes (Lovable)
-b735718 Changes (Lovable)
-52b7de5 Changes (Lovable)
-10afe8e Changes (Lovable)
+cf974f9  fix(p0): sales persistence, simulator guard, usage tracking, consecutiveErrors scope
 ```
+
+All four P0 audit bugs are fixed. Working tree is clean. Branch is up to date with remote.
+
+---
+
+## Recently Modified Files
+
+| File | Last change |
+|---|---|
+| `src/routes/index.tsx` | P0-1 sales persistence, P0-2 simulator guard, P0-3 usage tracking |
+| `src/components/SquarePanel.tsx` | P0-2 `onConnectionChange` prop wired |
+| `src/lib/toast.functions.ts` | P0-4 `consecutiveErrors` scope fixed |
 
 ---
 
@@ -39,31 +42,29 @@ KitchenIntel is an AI-powered kitchen operating system for restaurants.
 **Stack:** TanStack Start (SSR) · React 19 · Tailwind CSS v4 · Supabase · Cloudflare Workers · Bun
 
 **Key architectural facts:**
-- All app state (inventory, stations, recipes, vendors, sales) lives in `localStorage` under `ki_projects_v1` — no server-side user data store yet
-- `src/routes/index.tsx` (~2200 lines) is a single-file monolith containing all UI views, context, types, and primitives
+- All user app state lives in `localStorage` under `ki_projects_v1`, Supabase-write-through (800 ms debounce)
+- `src/routes/index.tsx` (~2700 lines) is a monolith containing all UI views, context, types, and primitives
 - Navigation is tab-based state (`tab` string in `Shell`), not separate routes
 - Server functions in `src/lib/*.functions.ts` are callable from the client via `useServerFn()`
-- Server-only helpers in `src/lib/*.server.ts` (Supabase admin, POS API calls) must never be imported client-side
-- `src/integrations/supabase/client.server.ts` and `client.ts` are **auto-generated** — do not edit
-- `src/routeTree.gen.ts` is **auto-generated** by TanStack Router — do not edit
-- `vite.config.ts` uses `@lovable.dev/vite-tanstack-config` which already bundles TanStack Start, React, Tailwind, Cloudflare — do not add these plugins manually or the build breaks
+- Server-only helpers in `src/lib/*.server.ts` must never be imported client-side
+- `src/integrations/supabase/client.server.ts` is **auto-generated** — do not edit
+- `src/routeTree.gen.ts` is **auto-generated** — do not edit
+- `vite.config.ts` uses `@lovable.dev/vite-tanstack-config` — do NOT add TanStack/React/Tailwind/Cloudflare plugins manually
 
 **Local dev:**
 ```bash
 bun install
-bun dev      # starts on port 8080 (or next available)
-bun build    # Cloudflare Workers production build
+bun dev          # starts on port 8080
+bun run build    # Cloudflare Workers production build (NOT bun build)
 bun lint
 bun format
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is not required for local frontend dev. Missing it triggers a one-time warning (not spam) via `src/lib/admin-guard.ts`. All localStorage-based features work without it.
+`SUPABASE_SERVICE_ROLE_KEY` is not required locally. Missing it triggers a one-time warning via `src/lib/admin-guard.ts`. All localStorage/Supabase features work via the anon key.
 
 ---
 
 ## Environment Variables
-
-See `.env.example` for the full list with instructions.
 
 | Variable | Required locally | Purpose |
 |---|---|---|
@@ -77,164 +78,180 @@ See `.env.example` for the full list with instructions.
 | `TOAST_WEBHOOK_SIGNATURE_KEY` | Optional | Toast webhook verification |
 | `PUBLIC_BASE_URL` | Optional | OAuth redirect + webhook URL (defaults to Lovable app URL) |
 
-`.env` is gitignored. It was previously committed (commit `53f39d0`) but only contained the anon key — no service role key was ever committed.
-
 ---
 
-## Completed Work (this session)
+## Completed Milestones
 
 ### Infrastructure
-- **CLAUDE.md** — full architecture reference, dev rules, env var table
-- **docs/ROADMAP.md** — full audit with 32 prioritized items and effort estimates
-- **.env.example** — all required vars with instructions and Lovable Cloud notes
-- **.gitignore** — added `.env`, `.env.local`, `.env.*.local`
-- **src/lib/admin-guard.ts** — `requireAdmin()` warn-once guard for server functions
-- **`getLivePosFeed`** — applies `requireAdmin()` to stop 8s polling spam when service role key is absent
+- Supabase Auth — email/password login, signup, logout, session persistence
+- Server-side persistence — `public.projects` + `public.project_state`, 800 ms write-through
+- `src/lib/admin-guard.ts` — warn-once guard for server functions lacking service role key
+- `CLAUDE.md` — full architecture reference, dev rules, env var table
 
-### P0 Bug Fixes (all committed separately)
+### Toast Integration — Steps 3A–5 ✓
+- Real badge status from `getToastStatus()`
+- POS Sync Status card wired to live Supabase counts
+- Webhook URL in Settings from server response
+- Expired-token banner with Reconnect button
+- 15 s polling so badge stays fresh without page reload
+- `consecutiveErrors` surfaced in both Toast and Square panels
 
-| Commit | Bug | Root cause | Fix |
+### Location / Project Separation — all 5 phases ✓
+- `idx_pos_orders_location` index
+- `getLivePosFeed` + `listRecentToastOrders` + `listRecentOrders` accept optional `locationId`
+- `Location` type has `posLocationId?: string`
+- Toast `restaurant_guid` written into active location on status refresh
+- `ToastPanel` and `SquarePanel` filter orders by location
+
+### P1 CRUD modals ✓
+- All `window.prompt`/`window.confirm` replaced with rendered `Modal` primitive
+- Project rename/delete, station rename/remove, disconnect confirmation for both panels
+
+### P2 Milestones ✓
+- **P2-A**: Item CRUD — `ItemForm` for add + edit + delete with full 9-field form
+- **P2-B**: Recipe editor — `MenuItemForm`, editable ingredient table, add/remove/qty rows, delete confirm
+- **P2-C**: Toast status polling — 15 s `setInterval` in `Shell`
+- **P2-D**: Per-location order filtering in both POS panels
+
+### P0 Audit Fixes ✓ (commit `cf974f9`)
+- **P0-1**: `sales: SalesRow[]` added to `Persist` type; restored from persisted state; write-through with 500-row cap
+- **P0-2**: Simulator suppressed when real POS is connected (`realPosConnectedRef`; `SquarePanel.onConnectionChange`)
+- **P0-3**: Real POS feed tick now updates `item.usage[day]` in addition to `item.current`
+- **P0-4**: `consecutiveErrors` moved outside `if (conn)` in `getToastStatus` — always defined in return value
+
+---
+
+## Open Issues
+
+### P1 — High Priority (no blockers, bounded scope)
+
+| ID | Issue | File(s) | Effort |
 |---|---|---|---|
-| `bfca90d` | Hardcoded `projectId` | `project.id` never added to app context; two sites pasted a Lovable UUID | Added `projectId: string` to `AppCtx`; set from `project.id` in `ProjectWorkspace` |
-| `90142e1` | `Math.random()` in sales feed | `SalesRow` had no timestamp; display fabricated random minutes every render | Added `ts: number` to `SalesRow`, stamped at push time in sim and real POS handler |
-| `bcaf6f4` | Fake "Connect" for unimplemented integrations | Button wrote only to `Shell` `useState`; state reset on every refresh | Added `implemented?: boolean` to `Integration` type; non-implemented show "Coming soon" |
-| `da4d61c` | "Toast · Live" badge always shown | Three UI sites hardcoded the badge regardless of connection state | Badges now conditional on `sales.length > 0`; "Toast" name removed |
+| P1-A | Dashboard AI insights — all three cards are hardcoded strings | `index.tsx` Dashboard component | M |
+| P1-B | Forecast header stats — 312 covers, +12% weather, +24% event hardcoded | `index.tsx` Forecast component | S |
+| P1-C | Reports stats — Waste 2.4%, COGS 28.2%, Labor 22.8%, Prep Accuracy 94% static | `index.tsx` Reports component | M |
+| P1-D | Inventory "Export CSV" button is inert | `index.tsx` Inventory component | S |
+| P1-E | Prep "Print" button is inert | `index.tsx` Prep component | S |
+| P1-F | "Send to Stations" button is inert | `index.tsx` Prep component | S |
+| P1-G | Prep List checkboxes reset on tab switch | `index.tsx` Prep component | S |
+| P1-H | Settings API Key is fake (`ki_live_••••••••3f8a`) | `index.tsx` Settings component | XS |
+| P1-I | "4 webhooks active" badge hardcoded | `index.tsx` Settings component | XS |
+| P1-J | Deliveries tab has no implementation — should show Coming Soon or be hidden | `index.tsx` nav + Deliveries component | XS |
+| P1-K | Duplicate Menu Item Mapping table at bottom of Integrations view | `index.tsx` Integrations component | XS |
+
+### P2 — Data integrity
+
+| ID | Issue | Effort |
+|---|---|---|
+| P2-A | `pos_orders.project_id` is TEXT — UUID migration needed for FK integrity | L (migration + backfill) |
+| P2-B | `getToastStatus.orders24h` is project-wide, not per-location filtered | S |
+| P2-C | No conflict resolution in write-through (last write wins) | L |
+
+### P3 — Git / release
+
+| ID | Item |
+|---|---|
+| P3-A | PR `clawbot-dev` → `main` — review and merge |
+
+### P4 — New features (not started)
+
+- Clover POS, Lightspeed, QuickBooks integrations
+- Barcode lookup (UPC → product)
+- Real forecasting engine (weather + events API)
+- Email daily summary
+- Role-based access (Supabase RLS user roles)
+- Supplier ordering / PO workflow from Forecast / Deliveries
 
 ---
 
-## Supabase Schema (existing tables)
+## Supabase Schema
 
-All tables have RLS enabled. Access is service-role-only via server functions.
+Supabase project ID: `muklqaivygnxpubkphbx`
+
+All tables use RLS. Access via service role key on server functions, anon key + user session for `projects`/`project_state`.
 
 ```
-pos_orders          — normalized order feed (Toast + Square)
-square_connections  — Square OAuth tokens per project
-square_catalog_map  — Square catalog item → internal menu SKU mapping
-square_webhook_events — inbound Square webhook log
-toast_connections   — Toast client credentials + access token per project
-toast_menu_map      — Toast item GUID → internal menu SKU mapping
-toast_webhook_events — inbound Toast webhook log
+public.projects              — one row per restaurant workspace (UUID PK, owner = auth.uid())
+public.project_state         — serialised Persist JSON blob, 1:1 with projects
+pos_orders                   — normalised order feed (Toast + Square)
+square_connections           — Square OAuth tokens per project
+square_catalog_map           — Square catalog item → internal menu SKU mapping
+square_webhook_events        — inbound Square webhook log
+toast_connections            — Toast client credentials + access token per project
+toast_menu_map               — Toast item GUID → internal menu SKU mapping
+toast_webhook_events         — inbound Toast webhook log
 ```
 
-Migrations are in `supabase/migrations/`. Supabase project ID: `muklqaivygnxpubkphbx`.
+Migration files in `supabase/migrations/`.
 
 ---
 
-## Remaining Roadmap
+## POS Integration Status
 
-Full detail in `docs/ROADMAP.md`. Summary by priority:
+### Toast
+- **OAuth flow**: client_credentials (restaurant supplies clientId + clientSecret + restaurantGuid)
+- **Token storage**: `toast_connections` table, auto-refreshed on expiry
+- **Status polling**: `getToastStatus` every 15 s in Shell
+- **Webhook**: `/api/public/toast/webhook` — HMAC-verified, idempotent insert, order normalization
+- **Location filtering**: `restaurant_guid` written into `Location.posLocationId` on status refresh
+- **Consecutive errors**: surfaced in `ToastPanel` amber banner when `>= 3`
+- **Outstanding**: `orders24h` is project-wide; per-location count not yet implemented (P2-B)
 
-### P1 — Core missing CRUD (blocks daily use)
-- **#5** Item edit modal — no way to edit name, unit, par, max, station, category, cost after creation · **M**
-- **#6** "Add Item" dialog — Inventory button is inert; only AI Scanner can add items · **M**
-- **#7** Recipe edit — can view/delete but cannot edit ingredients, quantities, price, or station · **M**
-- **#8** Replace `window.prompt`/`window.confirm` — breaks iOS Safari PWA and Cloudflare Workers SSR · **S**
-
-### P2 — Data integrity & persistence
-- **#9** Server-side persistence — all data in localStorage; new browser/device loses everything · **L**
-- **#10** Auth — `auth-attacher.ts` and `auth-middleware.ts` exist but completely unwired · **L**
-- **#11** Update 7-day usage from real sales — `usage[]` arrays never update after seeding · **M**
-- **#12** Real POS Sync Status card — "8s ago / 1,284 records / 142ms" are hardcoded · **S**
-
-### P3 — Partial features to complete
-- **#13** CSV export · **S**
-- **#14** Prep print · **S**
-- **#15** Sales Intelligence real calculations (trends, Rush Risk) · **M**
-- **#16** Forecasting — replace hardcoded cover count + factors · **M**
-- **#17** Reports — compute COGS, waste %, labor from real data · **M**
-- **#18** Dashboard AI Insights — generate from live inventory instead of hardcoded strings · **M**
-- **#19** Deliveries — wire "Scan invoice" + basic PO receive flow · **L**
-
-### P4 — Settings completeness
-- **#20** Show real webhook URLs in Settings (currently shows fake `api.kitchenintel.io`) · **S**
-- **#21** Users & Roles — wire to Supabase auth once auth is in place · **L**
-- **#22** "Send to Stations" — prep list export by station · **M**
-- **#23** Email Daily summary · **L**
-
-### P5 — New integrations
-- **#24** Clover POS · **L**
-- **#25** Lightspeed · **L**
-- **#26** QuickBooks · **L**
-- **#27** Barcode lookup (UPC → product info) · **M**
-- **#28** Real forecasting data (weather API + events) · **XL**
-
-### P6 — Polish
-- **#29** Remove emoji from Scanner mode picker · **XS**
-- **#30** Deliveries empty state · **XS**
-- **#31** Inventory count badge in sidebar · **XS**
-- **#32** Bell/notification system for critical inventory · **M**
+### Square
+- **OAuth flow**: standard OAuth2 with HMAC-signed state (CSRF protection)
+- **Token storage**: `square_connections` table
+- **Status polling**: `getSquareStatus` every 15 s in `SquarePanel`
+- **Webhook**: `/api/public/square/webhook` — HMAC-verified, idempotent insert, order normalization
+- **Location filtering**: `location_id` self-derived from `status.connection.location_id`
+- **Consecutive errors**: surfaced in `SquarePanel` amber banner when `>= 3`
+- **Simulator guard**: `SquarePanel` now reports connection status to Shell via `onConnectionChange` prop; simulator is suppressed when Square is live
 
 ---
 
-## Known Issues
+## Persist Type (current shape)
 
-### Data model
-- `project_id` in `toast_connections` and `square_connections` is `TEXT` storing client-generated IDs like `prj_abc123` — not a real Supabase UUID. Foreign key integrity is impossible until persistence moves to Supabase (#9).
-- `SalesRow.ts` is epoch ms from the client clock, not from the POS order timestamp. Real order times from Toast/Square are in `pos_orders.ordered_at` but not surfaced to the sales feed yet.
-- 7-day `usage[]` arrays on `Item` are set once at seed/scan time and never update from real sales data.
-
-### UI / UX
-- `window.prompt()` used for project rename (index.tsx:547) and station rename (index.tsx:2035) — breaks in iOS Safari PWA mode and Cloudflare Workers SSR.
-- `window.confirm()` used for project delete (index.tsx:599) and station remove (index.tsx:2048) — same breakage.
-- Inventory "Export CSV", "+ Add Item", Prep "Print", "Send to Stations", Reports "Export PDF", "Email Daily", Forecast "Order" buttons all have no `onClick` handler.
-- Recipe editing is impossible — only view and delete.
-- `INTEGRATIONS_SEED` initializes Toast as `status: "connected"` unconditionally. The tile grid for Toast/Square does not reflect real Supabase connection state (though `ToastPanel`/`SquarePanel` above it do).
-
-### Hardcoded values still in the codebase
-- `publicBaseUrl()` in `square.server.ts:20` and `toast.server.ts:20` falls back to the Lovable app URL — correct for production, but should be overridden via `PUBLIC_BASE_URL` in any custom deployment.
-- Reports: Waste 2.4%, COGS 28.2%, Labor 22.8%, Prep Accuracy 94%, labor chart data are all static.
-- Forecasting: 312 covers, +12% weather factor, +24% event boost are all static.
-- Dashboard AI Insights: all three cards are hardcoded strings.
-- POS Sync Status card: "8s ago", "1,284 records/day", "p95 · 142ms" are hardcoded.
-- Settings API Key (`ki_live_••••••••3f8a`) and Webhook URL (`api.kitchenintel.io`) are fake.
-- Users & Roles section: four hardcoded role cards, "Manage" button is inert.
-
-### Auth / security
-- No login, no user sessions. Any browser can access any project.
-- `toast_connections` and `square_connections` have no user ownership — they're keyed only by `project_id` (a client-generated string).
-- `auth-attacher.ts` and `auth-middleware.ts` exist in `src/integrations/supabase/` but are not imported or used anywhere.
+```typescript
+type Persist = {
+  brand: string;
+  locations: Location[];
+  activeLocationId: string | null;
+  stationModules: StationModule[];
+  categories: string[];
+  vendors: Vendor[];
+  items: Item[];         // usage: number[7] now updated by real POS feed
+  menu: MenuItem[];
+  sales: SalesRow[];     // ← added P0-1; capped at 500 rows in write-through
+};
+```
 
 ---
 
-## P1 Plan — Prerequisites for Real Toast Integration
+## Recommended Next Task
 
-Agreed plan from this session, in dependency order:
+**P1 polish pass** — work through P1-J, P1-K, P1-H, P1-I first (all XS, 30 min total), then P1-D, P1-E, P1-G (S-sized, each ~2 h). Defer P1-A/B/C (computed analytics) until those quick wins are done.
 
-### 1. Auth (M)
-Wire Supabase Auth (email/password or magic link). Add login screen before project picker. Attach `user.id` to projects. Protect server functions behind valid session. **Nothing else can be properly scoped without user identity.**
+**Recommended next prompt for a new session:**
 
-### 2. Server-side persistence (L)
-Add `projects` and `project_state` tables to Supabase. Migrate `loadProjects`/`saveProjects` to read/write Supabase. Keep localStorage as write-through cache. `project_id` must become a real Supabase UUID so `toast_connections` can reference it as a proper foreign key.
+```
+Continue KitchenIntel from branch clawbot-dev (latest commit cf974f9).
+Read docs/HANDOFF.md and docs/SESSION_STATE.md before writing any code.
 
-### 3. POS connection model (M)
-Remove hardcoded `status: "connected"` from Toast in `INTEGRATIONS_SEED`. Derive tile status from `getToastStatus` server function response. Wire real Sync Status card to `toast_webhook_events` counts. Show real webhook URL (`publicBaseUrl() + "/api/public/toast/webhook"`) in Settings. Add reconnect prompt when token refresh fails.
+Start with P1 polish — fix the open P1 issues in priority order:
 
-### 4. Location/project separation (S–M)
-Filter `getLivePosFeed` by `location_id`. Map Toast `restaurant_guid` explicitly to `activeLocationId`. Single-location mapping is sufficient for now — full multi-location can come later.
+1. P1-J: Deliveries nav — add a "Coming Soon" overlay or hide the tab.
+2. P1-K: Remove the duplicate Menu Item Mapping table from the bottom of the
+         Integrations view (keep the one inside each panel; remove the standalone Card).
+3. P1-H: Remove fake API key from Settings API & Webhooks card.
+4. P1-I: Replace hardcoded "4 webhooks active" badge with a dynamic count derived
+         from toastStatusData.webhookCount + squareStatus.webhookCount.
+5. P1-D: Wire Inventory "Export CSV" to download a real CSV of the current item list.
+6. P1-E: Wire Prep "Print" to window.print() with a print-only stylesheet.
+7. P1-G: Persist Prep List checkbox state in a local ref so it survives tab switches.
 
-### 5. Error handling (S)
-Surface `toast_webhook_events.error` count in Integrations panel. Add consecutive-failure counter to live feed poll. Standardize all server function error shapes to `{ ok: boolean, error?: string }`.
-
----
-
-## Next Recommended Tasks
-
-In order:
-
-1. **Commit `docs/`** — ROADMAP.md and HANDOFF.md are untracked
-2. **P1-8 (S)** — Replace `window.prompt`/`window.confirm` with inline modals; quick win, unblocks iOS PWA use
-3. **P1-5 + P1-6 (M)** — Item edit modal + Add Item dialog; together these make inventory actually usable without the AI scanner
-4. **P1-7 (M)** — Recipe edit; required before real Toast SKU mapping is trustworthy
-5. **P2-10 (M→L)** — Auth; the first hard dependency for everything server-side
-6. **P2-9 (L)** — Server-side persistence; required for multi-device, multi-user, and proper `project_id` FK integrity
-7. **P3-12 + P4-20 (S each)** — Real POS Sync Status + real webhook URL in Settings; quick, high trust-building value
-
----
-
-## Effort Key
-
-- **XS** < 1 hour
-- **S** 2–4 hours
-- **M** half to full day
-- **L** 2–3 days
-- **XL** week+
+Rules:
+- Surgical edits only — no unrelated refactors.
+- Run bun run build after each fix to verify clean compile.
+- Commit each fix with a clear message (fix(p1): ...).
+- Push after each commit.
+- Update docs/SESSION_STATE.md and docs/HANDOFF.md when all P1 fixes are done.
+```

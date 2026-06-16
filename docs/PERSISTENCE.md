@@ -115,10 +115,32 @@ files from being imported by SSR routes.
 
 ---
 
-## Known limitations (to address in Step 3)
+## Persist type — current shape
+
+```typescript
+type Persist = {
+  brand: string;
+  locations: Location[];
+  activeLocationId: string | null;
+  stationModules: StationModule[];
+  categories: string[];
+  vendors: Vendor[];
+  items: Item[];        // usage: number[7] updated by real POS feed tick
+  menu: MenuItem[];
+  sales: SalesRow[];    // added P0-1 (2026-06-16); capped at 500 rows in write-through
+};
+```
+
+`sales` is restored from `init.sales ?? []` on project load. The write-through
+uses `sales.slice(0, 500)` to prevent the `project_state` JSON blob from growing
+unbounded. In-memory the runtime cap is 200 rows (per `setSales` calls).
+
+---
+
+## Known limitations
 
 - `toast_connections`, `square_connections`, and `pos_orders` still use
   `project_id TEXT` referencing pre-migration `prj_abc1234`-style IDs. These
-  columns will be migrated to UUID FK references in Step 3 (POS connection model).
+  columns will be migrated to UUID FK references (roadmap P2-A).
 - No conflict resolution — last write wins. Concurrent edits from two browsers
-  logged in as the same user will overwrite each other.
+  logged in as the same user will overwrite each other (roadmap P2-C).
