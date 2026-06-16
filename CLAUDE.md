@@ -47,12 +47,14 @@ All application data (inventory items, station modules, recipes, sales, vendors,
 - `src/integrations/supabase/client.ts` — browser client, uses `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (anon key, respects RLS)
 - `src/integrations/supabase/client.server.ts` — server-only admin client, uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS); **auto-generated — do not edit**
 
-### Local dev vs Lovable Cloud
-The full backend (POS sync, webhook processing, admin Supabase operations) runs through **Lovable Cloud** in production. `SUPABASE_SERVICE_ROLE_KEY` is injected by Lovable Cloud and is not required locally for normal frontend work — inventory, UI, and all localStorage-based state work without it.
+### Local development
+KitchenIntel is developed locally against Supabase. GitHub (`clawbot-dev` branch) is the source of truth. Run `bun dev` on port 8080.
 
-`src/lib/admin-guard.ts` provides a `requireAdmin()` helper that warns once to the terminal and returns `false` when the key is missing. Apply it at the top of any server function that is called **automatically** (e.g. polling loops). User-triggered server functions (button clicks, webhook routes) can throw normally since they only fire on explicit action.
+`SUPABASE_SERVICE_ROLE_KEY` is **required** for all Square and Toast server-side features (OAuth, webhooks, catalog sync, order processing). Without it, `supabaseAdmin` throws immediately on first access and every POS server function crashes. Get it from Supabase Dashboard → Settings → API → service_role secret.
 
-The only auto-polling server function is `getLivePosFeed` (called every 8 s in `Shell`). It already uses `requireAdmin()` and returns `{ ok: false, rows: [] }` silently when the key is absent.
+`PUBLIC_BASE_URL` must be set to a public HTTPS URL (e.g. an ngrok tunnel) for Square OAuth redirect and webhook delivery to work. Without it, `publicBaseUrl()` falls back to `http://localhost:8080`, which Square rejects for both flows.
+
+`src/lib/admin-guard.ts` provides a `requireAdmin()` helper for **auto-polling** functions only. It warns once and returns `false` so the polling loop can return an empty-but-safe result instead of crashing. Apply it only at the top of functions called on a timer (currently only `getLivePosFeed`). User-triggered functions should throw normally.
 
 ### POS integrations
 - **Toast** (`src/lib/toast.server.ts`): client_credentials flow — restaurants supply their own `clientId`/`clientSecret` from Toast Web; tokens are stored in the `toast_connections` Supabase table and auto-refreshed

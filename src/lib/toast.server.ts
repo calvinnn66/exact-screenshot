@@ -17,7 +17,9 @@ export function toastApiBase(env: ToastEnv) {
 export function publicBaseUrl(): string {
   const explicit = process.env.PUBLIC_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
-  return "https://project--aa475a88-be51-4f31-9bb2-d0266a47d1be.lovable.app";
+  // Local dev fallback. Webhook delivery requires a public HTTPS URL —
+  // set PUBLIC_BASE_URL to your ngrok URL before testing webhook flows.
+  return "http://localhost:8080";
 }
 
 export const WEBHOOK_PATH = "/api/public/toast/webhook";

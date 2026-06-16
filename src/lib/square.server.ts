@@ -14,10 +14,11 @@ export function squareApiBase(env: SquareEnv) {
 }
 
 export function publicBaseUrl(): string {
-  // Stable Lovable URL — used for OAuth redirect + webhook URL
   const explicit = process.env.PUBLIC_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
-  return "https://project--aa475a88-be51-4f31-9bb2-d0266a47d1be.lovable.app";
+  // Local dev fallback. OAuth and webhook delivery require a public HTTPS URL —
+  // set PUBLIC_BASE_URL to your ngrok URL before testing those flows.
+  return "http://localhost:8080";
 }
 
 export const REDIRECT_PATH = "/api/square/callback";
