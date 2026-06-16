@@ -14,14 +14,14 @@ _Updated: 2026-06-15 · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
+| `c2eedd4` | feat(pos): add optional locationId filter to getLivePosFeed (Phase 2) |
+| `0204c9a` | docs: record successful deployment of POS integration schema |
 | `36ba85a` | docs: update SESSION_STATE.md — Step 4 Phase 1 complete, Phase 2 plan |
 | `8c29b84` | feat(db): add idx_pos_orders_location — Step 4 Phase 1 |
 | `d5c3535` | feat(toast): token-expired banner with reconnect prompt (Step 3D) |
 | `d516e36` | feat(toast): wire Sync Status card to real getToastStatus data (Step 3B) |
 | `74ca79a` | feat(toast): wire real webhook URL from getToastStatus into Settings (Step 3C) |
 | `afec3e0` | feat(toast): derive toast status from getToastStatus (Step 3A) |
-| `85c4df1` | feat(persistence): wire Supabase write-through sync |
-| `49d3aa9` | feat(auth): wire Supabase Auth — login, signup, logout, session persistence |
 
 ---
 
@@ -29,48 +29,47 @@ _Updated: 2026-06-15 · Branch: `clawbot-dev`_
 
 ### Auth
 - Login / signup / logout via Supabase Auth
-- Session persistence across page reloads (Supabase session listener)
+- Session persistence across page reloads
 - `authUser` and `authChecked` state in `KitchenIntel` root component
 
 ### Database Persistence (Step 2)
-- **Migration applied** to live Supabase: `supabase/migrations/20260613120000_add_projects_persistence.sql`
-  - `public.projects` — one row per restaurant workspace, owned by `auth.users.id`
-  - `public.project_state` — serialized `Persist` JSONB blob, 1:1 with `projects`
-  - RLS: `auth.uid()` policies on both tables
-  - `touch_updated_at()` trigger function, `idx_projects_user` index
+- `public.projects` + `public.project_state` live in Supabase
 - `src/lib/projects-db.ts` — browser Supabase CRUD
 - 800 ms debounced write-through; `newProjectId()` → `crypto.randomUUID()`
 
 ### Toast Integration — Steps 3A–3D ✓
-- **3A**: Real badge status (connected / error / available) from `getToastStatus()` on mount
-- **3B**: `formatAgo` helper; `toastStatusData` state; POS Sync Status card wired to live data
-- **3C**: Settings webhook URL field reads `res.webhookUrl` from `getToastStatus()`
-- **3D**: `ToastPanel`: red expired-token banner with Reconnect button; `tokenExpiresIn` shows `"Expired"` not `"0m"`
+- **3A**: Real badge status from `getToastStatus()` on mount
+- **3B**: POS Sync Status card wired to live Source / Last sync / Orders 24h / Errors 24h
+- **3C**: Settings webhook URL reads `res.webhookUrl` from `getToastStatus()`
+- **3D**: `ToastPanel` expired-token banner with Reconnect button
 
 ### Location / Project Separation — Step 4
 
-#### Phase 1 ✓ — DB index committed and applied to live Supabase
-- Migration file: `supabase/migrations/20260615000000_add_pos_orders_location_idx.sql`
-- Index: `idx_pos_orders_location ON public.pos_orders(project_id, location_id, ordered_at DESC)`
+#### Live Supabase schema — fully verified ✓
 
-#### POS schema bootstrap ✓ — All tables deployed and verified in live Supabase
-Applied manually via Supabase SQL Editor (tables were missing from live DB; original migrations had never been applied):
+All POS/Toast tables confirmed present and operational in live Supabase project `muklqaivygnxpubkphbx`:
 
-| Table | Status |
-|---|---|
-| `public.square_connections` | ✓ Deployed (created in earlier bootstrap attempt) |
-| `public.square_catalog_map` | ✓ Deployed |
-| `public.square_webhook_events` | ✓ Deployed |
-| `public.pos_orders` | ✓ Deployed (with both indexes) |
-| `public.toast_connections` | ✓ Deployed |
-| `public.toast_menu_map` | ✓ Deployed |
-| `public.toast_webhook_events` | ✓ Deployed |
-| `idx_pos_orders_location` | ✓ Applied |
-| `pos_orders` added to `supabase_realtime` publication | ✓ Applied |
-| RLS enabled on all POS/Toast tables | ✓ Applied |
-| Triggers (`touch_updated_at`) on connections + map tables | ✓ Applied |
+| Table | Triggers | Indexes |
+|---|---|---|
+| `public.square_connections` | `trg_square_connections_touch` | `square_connections_project_idx`, `square_connections_merchant_idx` |
+| `public.square_catalog_map` | `trg_square_catalog_map_touch` ✓ | `square_catalog_map_project_idx` |
+| `public.square_webhook_events` | — | `square_webhook_events_merchant_idx`, `square_webhook_events_received_idx` |
+| `public.pos_orders` | — | `pos_orders_project_idx`, `idx_pos_orders_location` ✓ |
+| `public.toast_connections` | `touch_toast_connections` ✓ | `idx_toast_connections_project` |
+| `public.toast_menu_map` | `touch_toast_menu_map` ✓ | `idx_toast_menu_map_project` |
+| `public.toast_webhook_events` | — | `idx_toast_webhook_events_restaurant`, `idx_toast_webhook_events_received` |
 
-**Root cause of missing tables:** Migrations `20260521215705` and `20260521220339` were never applied to the live Supabase project. Only `20260613120000` (projects/project_state) had been applied. Bootstrap SQL was applied directly via SQL Editor.
+**Root cause of missing tables (resolved):** Migrations `20260521215705` and `20260521220339` had never been applied to the live project. Bootstrap SQL applied manually via Supabase SQL Editor. `CREATE OR REPLACE TRIGGER` syntax was incompatible with the live Postgres version; fixed by using plain `CREATE TRIGGER` with `DROP TRIGGER IF EXISTS` guards.
+
+#### Phase completion status
+
+| Phase | Description | Status |
+|---|---|---|
+| **Phase 1** | DB index `idx_pos_orders_location` | ✓ Committed `8c29b84` + applied to live DB |
+| **Phase 2** | `getLivePosFeed`: optional `locationId` param + conditional `.eq()` | ✓ Committed `c2eedd4` |
+| **Phase 3** | `Location` type: add `posLocationId?: string` | **Next** |
+| **Phase 4** | Write `restaurant_guid` from `getToastStatus` response into active `Location.posLocationId` | Pending Phase 3 |
+| **Phase 5** | Pass active `Location.posLocationId` as `locationId` to `livePosFn` | Pending Phase 4 |
 
 ---
 
@@ -79,38 +78,10 @@ Applied manually via Supabase SQL Editor (tables were missing from live DB; orig
 | Item | Status |
 |---|---|
 | `public.projects` / `public.project_state` | ✓ Live |
-| All POS/Toast tables (7 tables) | ✓ Live |
+| All POS/Toast tables (7 tables) | ✓ Live and verified |
 | `idx_pos_orders_location` (Phase 1 index) | ✓ Live |
 | RLS on all tables | ✓ Active |
 | Supabase project ID | `muklqaivygnxpubkphbx` |
-| Service role key (local dev) | Not required for project CRUD; required for POS server functions |
-
----
-
-## Step 4 — Location / Project Separation: remaining phases
-
-### Architecture gap (summary)
-Two separate location namespaces that never intersect:
-- **Client** `Persist.locations[].id` — `"loc_abc1234"` format, UI-managed
-- **POS** `pos_orders.location_id` — real external IDs (`restaurant_guid` for Toast, Square location ID for Square)
-
-`activeLocationId` cannot be passed directly to any DB query.
-
-### Phase completion status
-
-| Phase | Description | Status |
-|---|---|---|
-| **Phase 1** | DB index `idx_pos_orders_location` | ✓ Complete |
-| **Phase 2** | `getLivePosFeed`: add optional `locationId?: string` param + conditional `.eq()` | **Next** |
-| **Phase 3** | `Location` type: add `posLocationId?: string` field | Pending Phase 2 |
-| **Phase 4** | Wire `restaurant_guid` from `getToastStatus` response into active `Location.posLocationId` | Pending Phase 3 |
-| **Phase 5** | Thread `posLocationId` into `livePosFn` call | Pending Phase 4 |
-
-### Phase 2 plan (ready to implement)
-Single edit to `src/lib/pos.functions.ts`:
-1. Input schema: add `locationId: z.string().optional()`
-2. After `.eq("project_id", data.projectId)`: add `.eq("location_id", data.locationId)` only when `data.locationId` is set and non-empty
-3. Backward compatible — omitting `locationId` returns all project orders as before
 
 ---
 
@@ -118,7 +89,7 @@ Single edit to `src/lib/pos.functions.ts`:
 
 | Priority | Item |
 |---|---|
-| Step 4 Phases 2–5 | Location filter wired end-to-end |
+| Step 4 Phases 3–5 | Location filter wired end-to-end (type → POS ID link → feed call) |
 | Step 5 | Surface webhook errors: consecutive-failure counter in Toast panel |
 | P1 CRUD | Item edit modal, Add Item dialog, recipe edit — replace all `window.prompt` / `window.confirm` |
 
@@ -132,10 +103,10 @@ Single edit to `src/lib/pos.functions.ts`:
 | No conflict resolution in write-through | Last write wins if two browser tabs open as same user |
 | `getToastStatus` fires once on mount only | Stale connection badge until page reload |
 | `*.client.*` filenames blocked by TanStack Start SSR | New browser-only Supabase helpers must be named `*-db.ts` — never `*.client.ts` |
-| `listRecentToastOrders` / `listRecentOrders` / `getToastStatus.orders24h` — no location filter | ToastPanel + SquarePanel order tabs still show project-wide data; defer to later step |
+| `listRecentToastOrders` / `listRecentOrders` / `getToastStatus.orders24h` | Still show project-wide data; no location filter yet |
 
 ---
 
 ## Exact next task
 
-**Phase 2** — edit `src/lib/pos.functions.ts`: add optional `locationId` param to `getLivePosFeed` input schema and conditional `.eq("location_id", data.locationId)` filter.
+**Step 4 Phase 3** — add `posLocationId?: string` to the `Location` type in `src/routes/index.tsx`. Additive, no call sites break.
