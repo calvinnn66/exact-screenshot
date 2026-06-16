@@ -53,7 +53,7 @@ type MenuItem = {
   recipe: RecipeIngredient[];
 };
 type SalesRow = { menuId: string; hour: number; qty: number; ts: number };
-type Location = { id: string; name: string; address?: string; active: boolean };
+type Location = { id: string; name: string; address?: string; active: boolean; posLocationId?: string };
 type Vendor = { id: string; name: string; contact?: string; category?: string };
 type Integration = {
   id: string; name: string; category: "POS" | "Accounting" | "Reporting" | "Supplier";
@@ -975,6 +975,14 @@ function Shell({ hydrated }: { hydrated: boolean }) {
         }));
         setToastWebhookUrl(res.webhookUrl || "");
         setToastStatusData(res);
+        if (res.connection) {
+          const guid = (res.connection as any).restaurant_guid;
+          if (guid) {
+            app.setLocations(prev =>
+              prev.map(l => l.id === app.activeLocationId ? { ...l, posLocationId: guid } : l)
+            );
+          }
+        }
       } catch {
         // Service role key absent locally or network error — leave as "available"
       }
@@ -986,7 +994,8 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     let cancelled = false;
     const tick = async () => {
       try {
-        const res: any = await livePosFn({ data: { projectId, limit: 50 } });
+        const activePosLocId = app.locations.find(l => l.id === app.activeLocationId)?.posLocationId;
+        const res: any = await livePosFn({ data: { projectId, limit: 50, ...(activePosLocId ? { locationId: activePosLocId } : {}) } });
         if (cancelled || !res?.ok || !res.rows?.length) return;
         const hour = new Date().getHours();
         const newSalesRows: SalesRow[] = [];
