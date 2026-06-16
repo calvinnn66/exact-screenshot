@@ -72,6 +72,7 @@ export const getToastStatus = createServerFn({ method: "POST" })
     let webhookErrors = 0;
     let lastEventAt: string | null = null;
     let orders24h = 0;
+    let consecutiveErrors = 0;
 
     if (conn) {
       const { count: total } = await supabaseAdmin
@@ -104,7 +105,6 @@ export const getToastStatus = createServerFn({ method: "POST" })
         .eq("restaurant_guid", conn.restaurant_guid)
         .order("received_at", { ascending: false })
         .limit(20);
-      let consecutiveErrors = 0;
       for (const ev of recent || []) {
         if (ev.error != null) consecutiveErrors++;
         else break;

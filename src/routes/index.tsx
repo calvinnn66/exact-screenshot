@@ -200,6 +200,7 @@ type Persist = {
   vendors: Vendor[];
   items: Item[];
   menu: MenuItem[];
+  sales: SalesRow[];
 };
 
 export type Project = {
@@ -227,6 +228,7 @@ function emptyPersist(brand = "KitchenIntel"): Persist {
     vendors: [...DEFAULT_VENDORS],
     items: [],
     menu: [],
+    sales: [],
   };
 }
 
@@ -914,7 +916,7 @@ function ProjectWorkspace({ project, userEmail, onPatchState, onExit }: { projec
   const [vendors, setVendors] = useState<Vendor[]>(init.vendors);
   const [items, setItems] = useState<Item[]>(init.items);
   const [menu, setMenu] = useState<MenuItem[]>(init.menu);
-  const [sales, setSales] = useState<SalesRow[]>([]);
+  const [sales, setSales] = useState<SalesRow[]>(init.sales ?? []);
 
   // derived visible station names (sorted by order)
   const stations = useMemo(
@@ -925,10 +927,10 @@ function ProjectWorkspace({ project, userEmail, onPatchState, onExit }: { projec
   // persist on change (debounced via simple effect)
   useEffect(() => {
     const t = setTimeout(() => {
-      onPatchState({ brand, locations, activeLocationId, stationModules, categories, vendors, items, menu });
+      onPatchState({ brand, locations, activeLocationId, stationModules, categories, vendors, items, menu, sales: sales.slice(0, 500) });
     }, 250);
     return () => clearTimeout(t);
-  }, [brand, locations, activeLocationId, stationModules, categories, vendors, items, menu]);
+  }, [brand, locations, activeLocationId, stationModules, categories, vendors, items, menu, sales]);
 
   const ctxValue: AppCtx = {
     brand, setBrand,
@@ -963,15 +965,22 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     lastEventAt: string | null;
     orders24h: number;
   } | null>(null);
+  const [squareConnected, setSquareConnected] = useState(false);
   const [now, setNow] = useState(new Date());
   const isMobile = useIsMobile();
+  const realPosConnectedRef = useRef(false);
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
-  // POS sim → recipe-driven deduction
+  useEffect(() => {
+    realPosConnectedRef.current = !!(toastStatusData?.connection) || squareConnected;
+  }, [toastStatusData, squareConnected]);
+
+  // POS sim → recipe-driven deduction (suppressed when real POS is connected)
   useEffect(() => {
     if (!posLive) return;
     const t = setInterval(() => {
+      if (realPosConnectedRef.current) return;
       const hour = new Date().getHours();
       const picks = 1 + Math.floor(Math.random() * 3);
       const newRows: SalesRow[] = [];
@@ -1062,15 +1071,19 @@ function Shell({ hydrated }: { hydrated: boolean }) {
         }
 
         if (inventoryHits.length > 0) {
+          const day = new Date().getDay();
           app.setItems((prev: Item[]) => {
-            const next = prev.map((p) => ({ ...p }));
+            const next = prev.map((p) => ({ ...p, usage: [...p.usage] }));
             const byId: Record<string, Item> = Object.fromEntries(next.map((n) => [n.id, n]));
             for (const hit of inventoryHits) {
               const m = app.menu.find((mm: any) => mm.id === hit.menuId);
               if (!m) continue;
               for (const r of m.recipe) {
                 const it = byId[r.itemId];
-                if (it) it.current = Math.max(0, +(it.current - r.qty * hit.qty).toFixed(2));
+                if (it) {
+                  it.current = Math.max(0, +(it.current - r.qty * hit.qty).toFixed(2));
+                  it.usage[day] = +((it.usage[day] ?? 0) + r.qty * hit.qty).toFixed(2);
+                }
               }
             }
             return next;
@@ -1182,7 +1195,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "forecast"     && <Forecast/>}
           {tab === "reports"      && <Reports/>}
           {tab === "deliveries"   && <Deliveries/>}
-          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive} toastStatusData={toastStatusData}/>}
+          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive} toastStatusData={toastStatusData} onSquareConnected={setSquareConnected}/>}
           {tab === "settings"     && <Settings webhookUrl={toastWebhookUrl}/>}
         </main>
 
@@ -2351,7 +2364,7 @@ function Deliveries() {
   );
 }
 
-function Integrations({ integrations, setIntegrations, posLive, setPosLive, toastStatusData }: any) {
+function Integrations({ integrations, setIntegrations, posLive, setPosLive, toastStatusData, onSquareConnected }: any) {
   const { menu, projectId, locations, activeLocationId } = useApp();
   const menuSkus = menu.map((m: any) => ({ sku: m.id, name: m.name }));
   const posLocationId = locations.find((l: any) => l.id === activeLocationId)?.posLocationId;
@@ -2361,7 +2374,7 @@ function Integrations({ integrations, setIntegrations, posLive, setPosLive, toas
 
       <Grid cols="1fr 1fr" gap={16} style={{ marginBottom: 16 }}>
         <ToastPanel projectId={projectId} menuSkus={menuSkus} posLocationId={posLocationId} />
-        <SquarePanel projectId={projectId} menuSkus={menuSkus} />
+        <SquarePanel projectId={projectId} menuSkus={menuSkus} onConnectionChange={onSquareConnected} />
       </Grid>
 
       <Card title="POS Sync Status" action={<Pill tone={posLive ? "ok" : "neutral"}>{Icon.dot(posLive ? ui.ok : ui.muted)} {posLive ? "Simulator Live" : "Simulator Paused"}</Pill>} style={{ marginBottom: 16 }}>

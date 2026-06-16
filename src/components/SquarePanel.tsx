@@ -13,6 +13,7 @@ import {
 type Props = {
   projectId: string;
   menuSkus: { sku: string; name: string }[];
+  onConnectionChange?: (connected: boolean) => void;
 };
 
 const css = {
@@ -74,7 +75,7 @@ function timeAgo(iso: string | null) {
   return `${Math.round(s / 86400)}d ago`;
 }
 
-export function SquarePanel({ projectId, menuSkus }: Props) {
+export function SquarePanel({ projectId, menuSkus, onConnectionChange }: Props) {
   const statusFn = useServerFn(getSquareStatus);
   const authUrlFn = useServerFn(getSquareAuthUrl);
   const disconnectFn = useServerFn(disconnectSquare);
@@ -94,6 +95,7 @@ export function SquarePanel({ projectId, menuSkus }: Props) {
   const refresh = async () => {
     const s = await statusFn({ data: { projectId } });
     setStatus(s);
+    onConnectionChange?.(!!s?.connection);
     if (s?.connection) {
       const [m, o] = await Promise.all([
         mapListFn({ data: { projectId } }),
