@@ -2079,6 +2079,47 @@ function SalesIntel() {
   );
 }
 
+function MenuItemForm({ item, onSave, onClose }: { item?: MenuItem; onSave: (m: MenuItem) => void; onClose: () => void }) {
+  const { stations } = useApp();
+  const isEdit = !!item;
+  const [name, setName] = useState(item?.name ?? "");
+  const [station, setStation] = useState(item?.station ?? stations[0] ?? "");
+  const [price, setPrice] = useState(item?.price ?? 0);
+  const valid = name.trim() !== "";
+  const save = () => {
+    if (!valid) return;
+    onSave({ id: item?.id ?? uid("m"), posMap: item?.posMap ?? {}, recipe: item?.recipe ?? [], name: name.trim(), station, price });
+    onClose();
+  };
+  const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: ui.muted, marginBottom: 4, display: "block", letterSpacing: 0.2, textTransform: "uppercase" };
+  return (
+    <Modal title={isEdit ? "Edit Menu Item" : "New Menu Item"} onClose={onClose}>
+      <div style={{ marginBottom: 12 }}>
+        <span style={lbl}>Name *</span>
+        <input autoFocus value={name} onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && valid) save(); if (e.key === "Escape") onClose(); }}
+          style={inputStyle} placeholder="e.g. Classic Burger" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+        <div>
+          <span style={lbl}>Station</span>
+          <select value={station} onChange={e => setStation(e.target.value)} style={inputStyle}>
+            {stations.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <span style={lbl}>Menu Price ($)</span>
+          <input type="number" min="0" step="0.01" value={price || ""} onChange={e => setPrice(parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0.00" />
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+        <Btn variant="primary" disabled={!valid} onClick={save}><Icon.check /> {isEdit ? "Save changes" : "Create"}</Btn>
+      </div>
+    </Modal>
+  );
+}
+
 function RecipeEngine() {
   const { menu, items, setMenu } = useApp();
   const [selectedId, setSelectedId] = useState<string | null>(menu[0]?.id ?? null);
@@ -2087,11 +2128,24 @@ function RecipeEngine() {
   const cost = m ? m.recipe.reduce((s, r) => { const it = items.find(i => i.id === r.itemId); return s + (it ? it.costPerUnit * r.qty : 0); }, 0) : 0;
   const margin = m && m.price > 0 ? ((m.price - cost) / m.price) * 100 : 0;
 
+  type RM = { mode: "add" } | { mode: "edit-meta"; item: MenuItem } | { mode: "delete"; item: MenuItem };
+  const [rModal, setRModal] = useState<RM | null>(null);
+  const [addItemId, setAddItemId] = useState("");
+  const [addQty, setAddQty] = useState(1);
+  useEffect(() => { setAddItemId(""); setAddQty(1); }, [selectedId]);
+
+  const setRecipe = (recipe: RecipeIngredient[]) => {
+    if (!m) return;
+    setMenu(prev => prev.map(mm => mm.id === m.id ? { ...mm, recipe } : mm));
+  };
+  const unusedItems = items.filter(it => !m?.recipe.some(r => r.itemId === it.id));
+
   return (
     <div>
-      <PageHeader title="Recipe Engine" subtitle="Map menu items to inventory · auto-deduct on sale" actions={<Pill tone="info">Scan recipes in AI Scanner</Pill>}/>
+      <PageHeader title="Recipe Engine" subtitle="Map menu items to inventory · auto-deduct on sale" actions={<Btn variant="primary" onClick={() => setRModal({ mode: "add" })}><Icon.plus /> New Recipe</Btn>}/>
       <Grid cols="280px 1fr" gap={16}>
         <Card title={`Menu (${menu.length})`} pad={0}>
+          {menu.length === 0 && <div style={{ padding: 16, fontSize: 13, color: ui.muted }}>No menu items yet.</div>}
           {menu.map(mm => (
             <button key={mm.id} onClick={() => setSelectedId(mm.id)} style={{
               width: "100%", textAlign: "left", padding: "12px 16px", border: "none",
@@ -2105,7 +2159,7 @@ function RecipeEngine() {
           ))}
         </Card>
         <div>
-          {!m ? <Card><div style={{ fontSize: 13, color: ui.muted }}>Select or scan a recipe.</div></Card> : (
+          {!m ? <Card><div style={{ fontSize: 13, color: ui.muted }}>Select a menu item or create a new one.</div></Card> : (
             <>
               <Grid cols="repeat(auto-fit, minmax(140px, 1fr))" gap={10} style={{ marginBottom: 16 }}>
                 <Stat label="Menu Price" value={`$${m.price.toFixed(2)}`}/>
@@ -2113,26 +2167,62 @@ function RecipeEngine() {
                 <Stat label="Margin" value={`${margin.toFixed(1)}%`} sub={margin > 65 ? "Healthy" : "Review"}/>
                 <Stat label="POS Map" value={m.posMap.toast || "—"} sub="Toast SKU"/>
               </Grid>
-              <Card title={`${m.name} · Ingredient Map`} subtitle="Deducted automatically when this item is rung in" pad={0} action={<Btn size="sm" variant="danger" onClick={() => setMenu(prev => prev.filter(x => x.id !== m.id))}>Delete</Btn>}>
+              <Card
+                title={`${m.name} · Ingredients`}
+                subtitle="Deducted automatically when this item is rung in"
+                pad={0}
+                action={<div style={{ display: "flex", gap: 6 }}>
+                  <Btn size="sm" variant="ghost" onClick={() => setRModal({ mode: "edit-meta", item: m })}><Icon.pencil /></Btn>
+                  <Btn size="sm" variant="danger" onClick={() => setRModal({ mode: "delete", item: m })}>Delete</Btn>
+                </div>}
+              >
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 580 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
                     <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
-                      <Th>Ingredient</Th><Th>Station</Th><Th align="right">Qty / sale</Th><Th align="right">Unit cost</Th><Th align="right">Sale cost</Th>
+                      <Th>Ingredient</Th><Th>Station</Th><Th align="right">Qty / sale</Th><Th align="right">Unit cost</Th><Th align="right">Sale cost</Th><Th></Th>
                     </tr></thead>
                     <tbody>
-                      {m.recipe.map(r => {
+                      {m.recipe.map((r, idx) => {
                         const it = items.find(i => i.id === r.itemId);
-                        if (!it) return <tr key={r.itemId}><td colSpan={5} style={{ padding: 12, fontSize: 12, color: ui.muted }}>Missing item</td></tr>;
                         return (
-                          <tr key={r.itemId} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
-                            <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{it.name}</td>
-                            <td style={{ padding: "12px 16px", fontSize: 12, color: ui.muted }}>{it.station}</td>
-                            <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12 }}>{r.qty} {it.unit}</td>
-                            <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>${it.costPerUnit.toFixed(2)}</td>
-                            <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, fontWeight: 600 }}>${(it.costPerUnit * r.qty).toFixed(2)}</td>
+                          <tr key={`${r.itemId}-${idx}`} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
+                            <td style={{ padding: "8px 12px" }}>
+                              <select value={r.itemId} onChange={e => setRecipe(m.recipe.map((rr, i) => i === idx ? { ...rr, itemId: e.target.value } : rr))} style={{ ...selectStyle, fontSize: 12, maxWidth: 180 }}>
+                                {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                              </select>
+                            </td>
+                            <td style={{ padding: "8px 12px", fontSize: 12, color: ui.muted }}>{it?.station ?? "—"}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <input type="number" min="0.01" step="0.01" value={r.qty} onChange={e => setRecipe(m.recipe.map((rr, i) => i === idx ? { ...rr, qty: parseFloat(e.target.value) || 0 } : rr))} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "4px 6px", fontSize: 12 }}/>
+                                <span style={{ fontSize: 11, color: ui.muted }}>{it?.unit ?? ""}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it ? `$${it.costPerUnit.toFixed(2)}` : "—"}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", ...ui.mono, fontSize: 12, fontWeight: 600 }}>{it ? `$${(it.costPerUnit * r.qty).toFixed(2)}` : "—"}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                              <Btn size="sm" variant="ghost" onClick={() => setRecipe(m.recipe.filter((_, i) => i !== idx))}><Icon.x /></Btn>
+                            </td>
                           </tr>
                         );
                       })}
+                      {unusedItems.length > 0 && (
+                        <tr style={{ borderTop: `1px solid ${ui.line}`, background: ui.panel2 }}>
+                          <td style={{ padding: "8px 12px" }} colSpan={2}>
+                            <select value={addItemId} onChange={e => setAddItemId(e.target.value)} style={{ ...selectStyle, fontSize: 12, maxWidth: 220 }}>
+                              <option value="">— add ingredient —</option>
+                              {unusedItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                            <input type="number" min="0.01" step="0.01" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "4px 6px", fontSize: 12 }}/>
+                          </td>
+                          <td colSpan={2}/>
+                          <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                            <Btn size="sm" variant="primary" disabled={!addItemId} onClick={() => { if (!addItemId) return; setRecipe([...m.recipe, { itemId: addItemId, qty: addQty }]); setAddItemId(""); setAddQty(1); }}><Icon.plus /></Btn>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2141,6 +2231,21 @@ function RecipeEngine() {
           )}
         </div>
       </Grid>
+
+      {rModal?.mode === "add" && (
+        <MenuItemForm onSave={item => { setMenu(prev => [...prev, item]); setSelectedId(item.id); }} onClose={() => setRModal(null)} />
+      )}
+      {rModal?.mode === "edit-meta" && (
+        <MenuItemForm item={rModal.item} onSave={updated => setMenu(prev => prev.map(mm => mm.id === updated.id ? { ...mm, name: updated.name, station: updated.station, price: updated.price } : mm))} onClose={() => setRModal(null)} />
+      )}
+      {rModal?.mode === "delete" && (
+        <Modal title={`Delete "${rModal.item.name}"?`} message="This removes the menu item and its ingredient mapping." onClose={() => setRModal(null)}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setRModal(null)}>Cancel</Btn>
+            <Btn variant="danger" onClick={() => { setMenu(prev => prev.filter(x => x.id !== rModal.item.id)); setRModal(null); }}>Delete</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
