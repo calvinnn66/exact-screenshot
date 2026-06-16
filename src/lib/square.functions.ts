@@ -56,6 +56,7 @@ export const getSquareStatus = createServerFn({ method: "POST" })
     let webhookErrors = 0;
     let lastEventAt: string | null = null;
     let orders24h = 0;
+    let consecutiveErrors = 0;
 
     if (conn) {
       const { count: total } = await supabaseAdmin
@@ -88,7 +89,6 @@ export const getSquareStatus = createServerFn({ method: "POST" })
         .eq("merchant_id", conn.merchant_id)
         .order("received_at", { ascending: false })
         .limit(20);
-      let consecutiveErrors = 0;
       for (const ev of recent || []) {
         if (ev.error != null) consecutiveErrors++;
         else break;
