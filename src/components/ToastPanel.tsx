@@ -68,6 +68,7 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
   const [restaurantGuid, setRestaurantGuid] = useState("");
   const [mgmtGroupGuid, setMgmtGroupGuid] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const refresh = async () => {
     const s = await statusFn({ data: { projectId } });
@@ -118,8 +119,9 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
     }
   };
 
-  const disconnect = async () => {
-    if (!confirm("Disconnect Toast? Webhooks will stop syncing until reconnected.")) return;
+  const disconnect = () => setConfirmDisconnect(true);
+  const doDisconnect = async () => {
+    setConfirmDisconnect(false);
     setBusy("disconnect");
     try {
       await disconnectFn({ data: { projectId } });
@@ -152,6 +154,7 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
   }, [status]);
 
   return (
+    <>
     <div style={css.panel}>
       <div style={css.head}>
         <div>
@@ -355,5 +358,18 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
         )}
       </div>
     </div>
+    {confirmDisconnect && (
+      <div onClick={() => setConfirmDisconnect(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 380, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.2)" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0B0B0C", marginBottom: 8 }}>Disconnect Toast?</div>
+          <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 20, lineHeight: 1.5 }}>Webhooks will stop syncing until reconnected.</div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button style={css.btnGhost} onClick={() => setConfirmDisconnect(false)}>Cancel</button>
+            <button style={{ ...css.btn, background: "#B42318", borderColor: "#B42318" }} onClick={doDisconnect}>Disconnect</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

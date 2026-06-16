@@ -457,6 +457,17 @@ function statusOf(it: Item): { tone: "ok" | "warn" | "bad"; label: string } {
   return { tone: "ok", label: "In stock" };
 }
 const Th = ({ children, align = "left" }: any) => <th style={{ padding: "10px 16px", textAlign: align, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, color: ui.muted }}>{children}</th>;
+function Modal({ title, message, onClose, children }: { title?: string; message?: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.2)" }}>
+        {title && <div style={{ fontSize: 15, fontWeight: 700, color: ui.ink, marginBottom: 8 }}>{title}</div>}
+        {message && <div style={{ fontSize: 13, color: ui.muted, marginBottom: 20, lineHeight: 1.5 }}>{message}</div>}
+        {children}
+      </div>
+    </div>
+  );
+}
 function PageHeader({ title, subtitle, actions }: any) {
   const isMobile = useIsMobile();
   return (
@@ -708,6 +719,10 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
   const [location, setLocation] = useState("");
   const [rtype, setRtype] = useState("Restaurant");
   const [seed, setSeed] = useState<"blank" | "demo">("blank");
+  type ProjectModal =
+    | { type: "confirm-delete"; project: Project }
+    | { type: "rename"; project: Project; draft: string };
+  const [modal, setModal] = useState<ProjectModal | null>(null);
 
   const filtered = store.projects
     .filter(p => p.name.toLowerCase().includes(q.toLowerCase()))
@@ -740,11 +755,11 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
   };
 
   const rename = (p: Project) => {
-    const n = window.prompt("Rename project", p.name);
-    if (n && n.trim()) onUpdate(p.id, { name: n.trim() });
+    setModal({ type: "rename", project: p, draft: p.name });
   };
 
   return (
+    <>
     <div style={{ minHeight: "100vh", background: ui.bg, ...ui.font, padding: "24px 14px 40px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
@@ -792,7 +807,7 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
                           <span style={{ ...ui.mono, fontSize: 11 }}>{timeAgo(p.lastOpened)}</span>
                         </div>
                       </div>
-                      <Btn size="sm" variant="danger" onClick={() => { if (window.confirm(`Delete "${p.name}"? This cannot be undone.`)) onRemove(p.id); }}><Icon.x/></Btn>
+                      <Btn size="sm" variant="danger" onClick={() => setModal({ type: "confirm-delete", project: p })}><Icon.x/></Btn>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <Btn variant="primary" onClick={() => onOpen(p.id)} style={{ flex: "1 1 120px", justifyContent: "center" }}>Open</Btn>
@@ -849,6 +864,33 @@ function ProjectPicker({ store, onOpen, onCreate, onRemove, onUpdate }: {
         </Grid>
       </div>
     </div>
+    {modal?.type === "confirm-delete" && (
+      <Modal title={`Delete "${modal.project.name}"?`} message="This cannot be undone." onClose={() => setModal(null)}>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={() => setModal(null)}>Cancel</Btn>
+          <Btn variant="danger" onClick={() => { onRemove(modal.project.id); setModal(null); }}>Delete</Btn>
+        </div>
+      </Modal>
+    )}
+    {modal?.type === "rename" && (
+      <Modal title="Rename project" onClose={() => setModal(null)}>
+        <input
+          autoFocus
+          value={modal.draft}
+          onChange={e => setModal(m => m && m.type === "rename" ? { ...m, draft: e.target.value } : m)}
+          onKeyDown={e => {
+            if (e.key === "Enter" && modal.draft.trim()) { onUpdate(modal.project.id, { name: modal.draft.trim() }); setModal(null); }
+            if (e.key === "Escape") setModal(null);
+          }}
+          style={{ ...inputStyle, marginBottom: 16 }}
+        />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={() => setModal(null)}>Cancel</Btn>
+          <Btn variant="primary" disabled={!modal.draft.trim()} onClick={() => { if (modal.draft.trim()) { onUpdate(modal.project.id, { name: modal.draft.trim() }); setModal(null); } }}>Save</Btn>
+        </div>
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -2244,6 +2286,10 @@ function ManageStations() {
   const [showLib, setShowLib] = useState(false);
   const [customName, setCustomName] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
+  type StationModal =
+    | { type: "confirm-remove"; station: StationModule }
+    | { type: "rename"; station: StationModule; draft: string };
+  const [modal, setModal] = useState<StationModal | null>(null);
 
   const sorted = [...stationModules].sort((a, b) => a.order - b.order);
   const visible = sorted.filter(s => !s.hidden);
@@ -2278,20 +2324,13 @@ function ManageStations() {
     setStationModules(prev => [...prev, { ...s, id: uid("stn"), name, hidden: false, order }]);
   };
   const renameStation = (s: StationModule) => {
-    const next = window.prompt("Rename station", s.name);
-    if (!next || !next.trim() || next.trim() === s.name) return;
-    const finalName = uniqueName(next.trim());
-    const old = s.name;
-    setStationModules(prev => prev.map(x => x.id === s.id ? { ...x, name: finalName } : x));
-    // cascade
-    setItems(prev => prev.map(i => i.station === old ? { ...i, station: finalName } : i));
-    setMenu(prev => prev.map(m => m.station === old ? { ...m, station: finalName } : m));
+    setModal({ type: "rename", station: s, draft: s.name });
   };
   const toggleHide = (s: StationModule) =>
     setStationModules(prev => prev.map(x => x.id === s.id ? { ...x, hidden: !x.hidden } : x));
   const remove = (s: StationModule) => {
     const used = items.some(i => i.station === s.name) || menu.some(m => m.station === s.name);
-    if (used && !window.confirm(`"${s.name}" is assigned to inventory/recipes. Remove anyway? Items will be unassigned.`)) return;
+    if (used) { setModal({ type: "confirm-remove", station: s }); return; }
     setStationModules(prev => prev.filter(x => x.id !== s.id));
   };
   const move = (id: string, dir: -1 | 1) => {
@@ -2320,6 +2359,7 @@ function ManageStations() {
   });
 
   return (
+    <>
     <Card
       title="Manage Stations"
       subtitle={`${visible.length} active · ${hidden.length} hidden · drag to reorder`}
@@ -2419,6 +2459,58 @@ function ManageStations() {
         </div>
       )}
     </Card>
+    {modal?.type === "confirm-remove" && (
+      <Modal
+        title={`Remove "${modal.station.name}"?`}
+        message="This station is assigned to inventory items or recipes. Items will become unassigned."
+        onClose={() => setModal(null)}
+      >
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={() => setModal(null)}>Cancel</Btn>
+          <Btn variant="danger" onClick={() => { setStationModules(prev => prev.filter(x => x.id !== modal.station.id)); setModal(null); }}>Remove</Btn>
+        </div>
+      </Modal>
+    )}
+    {modal?.type === "rename" && (
+      <Modal title="Rename station" onClose={() => setModal(null)}>
+        <input
+          autoFocus
+          value={modal.draft}
+          onChange={e => setModal(m => m && m.type === "rename" ? { ...m, draft: e.target.value } : m)}
+          onKeyDown={e => {
+            if (e.key === "Escape") setModal(null);
+            if (e.key === "Enter") {
+              const next = modal.draft.trim();
+              if (next && next !== modal.station.name) {
+                const finalName = uniqueName(next);
+                const old = modal.station.name;
+                setStationModules(prev => prev.map(x => x.id === modal.station.id ? { ...x, name: finalName } : x));
+                setItems(prev => prev.map(i => i.station === old ? { ...i, station: finalName } : i));
+                setMenu(prev => prev.map(m => m.station === old ? { ...m, station: finalName } : m));
+              }
+              setModal(null);
+            }
+          }}
+          style={{ ...inputStyle, marginBottom: 16 }}
+        />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Btn variant="secondary" onClick={() => setModal(null)}>Cancel</Btn>
+          <Btn variant="primary" disabled={!modal.draft.trim() || modal.draft.trim() === modal.station.name}
+            onClick={() => {
+              const next = modal.draft.trim();
+              if (next && next !== modal.station.name) {
+                const finalName = uniqueName(next);
+                const old = modal.station.name;
+                setStationModules(prev => prev.map(x => x.id === modal.station.id ? { ...x, name: finalName } : x));
+                setItems(prev => prev.map(i => i.station === old ? { ...i, station: finalName } : i));
+                setMenu(prev => prev.map(m => m.station === old ? { ...m, station: finalName } : m));
+              }
+              setModal(null);
+            }}>Save</Btn>
+        </div>
+      </Modal>
+    )}
+    </>
   );
 }
 
