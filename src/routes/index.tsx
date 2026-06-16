@@ -1004,10 +1004,10 @@ function Shell({ hydrated }: { hydrated: boolean }) {
   const toastStatusFn = useServerFn(getToastStatus);
   const processedRef = useRef<Set<string>>(new Set());
 
-  // Fetch real Toast connection status on mount and when project changes
+  // Fetch real Toast connection status; refresh every 15 s to keep badge current
   useEffect(() => {
     if (!app.projectId) return;
-    (async () => {
+    const refresh = async () => {
       try {
         const res = await toastStatusFn({ data: { projectId: app.projectId } });
         setIntegrations(prev => prev.map(ig => {
@@ -1029,7 +1029,10 @@ function Shell({ hydrated }: { hydrated: boolean }) {
       } catch {
         // Service role key absent locally or network error — leave as "available"
       }
-    })();
+    };
+    refresh();
+    const t = setInterval(refresh, 15000);
+    return () => clearInterval(t);
   }, [app.projectId]);
   useEffect(() => {
     if (!posLive) return;
