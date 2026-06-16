@@ -966,6 +966,7 @@ function Shell({ hydrated }: { hydrated: boolean }) {
     orders24h: number;
   } | null>(null);
   const [squareConnected, setSquareConnected] = useState(false);
+  const [squareWebhookCount, setSquareWebhookCount] = useState(0);
   const [now, setNow] = useState(new Date());
   const isMobile = useIsMobile();
   const realPosConnectedRef = useRef(false);
@@ -1195,8 +1196,8 @@ function Shell({ hydrated }: { hydrated: boolean }) {
           {tab === "forecast"     && <Forecast/>}
           {tab === "reports"      && <Reports/>}
           {tab === "deliveries"   && <Deliveries/>}
-          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive} toastStatusData={toastStatusData} onSquareConnected={setSquareConnected}/>}
-          {tab === "settings"     && <Settings webhookUrl={toastWebhookUrl}/>}
+          {tab === "integrations" && <Integrations integrations={integrations} setIntegrations={setIntegrations} posLive={posLive} setPosLive={setPosLive} toastStatusData={toastStatusData} onSquareConnected={(c: boolean, n: number) => { setSquareConnected(c); setSquareWebhookCount(n); }}/>}
+          {tab === "settings"     && <Settings webhookUrl={toastWebhookUrl} webhookCount={(toastStatusData?.webhookCount ?? 0) + squareWebhookCount}/>}
         </main>
 
         {isMobile && <MobileTabBar tab={tab} setTab={setTab}/>}
@@ -2346,20 +2347,18 @@ function Reports() {
 }
 
 function Deliveries() {
-  const { vendors } = useApp();
   return (
     <div>
-      <PageHeader title="Deliveries" subtitle="Incoming POs · scanning · receiving" actions={<Btn variant="primary">+ New PO</Btn>}/>
-      <Grid cols="repeat(auto-fit, minmax(320px, 1fr))" gap={16}>
-        {vendors.length === 0 ? <Card><div style={{ fontSize: 13, color: ui.muted }}>No vendors yet. Add vendors in Settings.</div></Card> :
-          vendors.slice(0, 4).map(v => (
-            <Card key={v.id} title={v.name} subtitle="No scheduled deliveries" action={<Pill tone="neutral">Idle</Pill>}>
-              <div style={{ fontSize: 13, color: ui.muted, marginBottom: 12 }}>Use the AI Scanner to receive a delivery — snap one photo of the invoice and every line item will be added to inventory.</div>
-              <Btn variant="primary" size="sm">{Icon.camera(14)} Scan invoice</Btn>
-            </Card>
-          ))
-        }
-      </Grid>
+      <PageHeader title="Deliveries" subtitle="Incoming POs · scanning · receiving"/>
+      <Card>
+        <div style={{ textAlign: "center", padding: "48px 0" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Coming Soon</div>
+          <div style={{ fontSize: 13, color: ui.muted, maxWidth: 360, margin: "0 auto" }}>
+            Delivery receiving, PO creation, and invoice scanning are in development.
+            In the meantime, use the AI Scanner to receive deliveries.
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -2415,25 +2414,6 @@ function Integrations({ integrations, setIntegrations, posLive, setPosLive, toas
         );
       })}
 
-      <Card title="Menu Item Mapping" subtitle="Map POS SKUs to KitchenIntel recipes" pad={0}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 540 }}>
-            <thead><tr style={{ background: ui.panel2, borderBottom: `1px solid ${ui.line}` }}>
-              <Th>POS SKU</Th><Th>POS Name</Th><Th>Mapped Recipe</Th><Th>Status</Th>
-            </tr></thead>
-            <tbody>
-              {menu.map(m => (
-                <tr key={m.id} style={{ borderBottom: `1px solid ${ui.lineSoft}` }}>
-                  <td style={{ padding: "12px 16px", ...ui.mono, fontSize: 12, color: ui.muted }}>{m.posMap.toast || "—"}</td>
-                  <td style={{ padding: "12px 16px", fontSize: 13 }}>{m.name}</td>
-                  <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600 }}>{m.name} <span style={{ color: ui.muted, fontWeight: 400 }}>· {m.recipe.length} ing</span></td>
-                  <td style={{ padding: "12px 16px" }}>{m.posMap.toast ? <Pill tone="ok">Mapped</Pill> : <Pill tone="warn">Unmapped</Pill>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }
@@ -2443,7 +2423,7 @@ const kvValue: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginTop:
 /* ============================================================
    SETTINGS — full admin
    ============================================================ */
-function Settings({ webhookUrl }: { webhookUrl: string }) {
+function Settings({ webhookUrl, webhookCount = 0 }: { webhookUrl: string; webhookCount?: number }) {
   const app = useApp();
   return (
     <div>
@@ -2454,9 +2434,10 @@ function Settings({ webhookUrl }: { webhookUrl: string }) {
           <Field label="Restaurant / Brand name" value={app.brand} onChange={app.setBrand}/>
         </Card>
         <Card title="API & Webhooks">
-          <Field label="API Key" value={"ki_live_••••••••3f8a"} onChange={() => {}}/>
           <Field label="Webhook URL" value={webhookUrl || `${window.location.origin}/api/public/toast/webhook`} onChange={() => {}}/>
-          <Pill tone="ok">{Icon.dot(ui.ok)} 4 webhooks active</Pill>
+          {webhookCount > 0
+            ? <Pill tone="ok">{Icon.dot(ui.ok)} {webhookCount} webhook{webhookCount !== 1 ? "s" : ""} active</Pill>
+            : <Pill tone="neutral">{Icon.dot(ui.muted)} No webhooks connected</Pill>}
         </Card>
       </Grid>
 

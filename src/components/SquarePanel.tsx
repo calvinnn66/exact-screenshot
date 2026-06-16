@@ -13,7 +13,7 @@ import {
 type Props = {
   projectId: string;
   menuSkus: { sku: string; name: string }[];
-  onConnectionChange?: (connected: boolean) => void;
+  onConnectionChange?: (connected: boolean, webhookCount: number) => void;
 };
 
 const css = {
@@ -95,7 +95,7 @@ export function SquarePanel({ projectId, menuSkus, onConnectionChange }: Props) 
   const refresh = async () => {
     const s = await statusFn({ data: { projectId } });
     setStatus(s);
-    onConnectionChange?.(!!s?.connection);
+    onConnectionChange?.(!!s?.connection, s?.webhookCount ?? 0);
     if (s?.connection) {
       const [m, o] = await Promise.all([
         mapListFn({ data: { projectId } }),
