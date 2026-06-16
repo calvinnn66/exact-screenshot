@@ -1,6 +1,6 @@
 # KitchenIntel — Session State Handoff
 
-_Updated: 2026-06-16 · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 (P2-B) · Branch: `clawbot-dev`_
 
 ---
 
@@ -14,11 +14,11 @@ _Updated: 2026-06-16 · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
+| `c2951fd` | feat(recipes): add editable recipe ingredient UI (P2-B) |
 | `b69902e` | feat(pos): per-location order filtering in POS panels (P2-D) |
 | `76139c9` | feat(pos): poll getToastStatus every 15 s to keep badge fresh (P2-C) |
 | `a439c78` | feat(inventory): add full item CRUD modals (P2-A) |
-| `c5efd1a` | feat(ui): replace all window.prompt/confirm with proper modal dialogs |
-| `8a7d8df` | docs: update SESSION_STATE.md — P1 complete, post-P1 roadmap |
+| `2ab4e0d` | docs: update SESSION_STATE.md — P2-A, P2-C, P2-D complete |
 
 ---
 
@@ -75,6 +75,14 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 - `getToastStatus` useEffect in Shell converted from one-shot to 15 s interval (`setInterval`)
 - Badge, expiry state, and POS Sync Status card stay fresh without a page reload
 
+### P2-B — Recipe editor ✓ (commit `c2951fd`)
+- `MenuItemForm` modal for creating and editing menu item meta (name, station, price)
+- `RecipeEngine` ingredient table is now fully editable: ingredient `<select>`, qty `<input>`, remove `×` button per row
+- Add-ingredient row at the bottom of the table; only lists items not already in the recipe
+- New Recipe button in PageHeader opens the add form and auto-selects the new item
+- Delete confirmation modal replaces the previous silent direct delete
+- Pencil button on the card header opens the edit-meta modal
+
 ### P2-D — Per-location order filtering in POS panels ✓ (commit `b69902e`)
 - `listRecentToastOrders` and `listRecentOrders` both accept optional `locationId`; conditionally apply `.eq("location_id")` using the same `let query; if (locationId) query = query.eq(...)` pattern established in `pos.functions.ts`
 - `ToastPanel` accepts `posLocationId` prop and passes it to the orders query; interval restarts when locationId changes
@@ -108,8 +116,9 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 
 ## Post-P2 roadmap
 
+All P2 items are complete. Suggested next priorities:
+
 | Priority | Item | Scope |
 |---|---|---|
-| P2-B | **Recipe editor** — proper recipe ingredient UI (currently read-only in most views) | UI only |
 | P3-A | **PR to main** — review and merge `clawbot-dev` into `main` | Git only |
 | P3-B | **`pos_orders.project_id` UUID migration** — align project_id column type with `crypto.randomUUID()` format | Migration + backfill |
