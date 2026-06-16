@@ -364,6 +364,7 @@ const Icon = {
   plus: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
   arrowUp: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   arrowDown: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  pencil: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
 };
 
 const NAV: { id: string; label: string; svg: React.ReactNode }[] = [
@@ -1779,12 +1780,106 @@ function ItemRow({ it, setItems }: any) {
   );
 }
 
+function ItemForm({ item, onSave, onClose }: { item?: Item; onSave: (it: Item) => void; onClose: () => void }) {
+  const { stations, categories } = useApp();
+  const isEdit = !!item;
+  const [name, setName] = useState(item?.name ?? "");
+  const [unit, setUnit] = useState(item?.unit ?? "");
+  const [current, setCurrent] = useState(item?.current ?? 0);
+  const [par, setPar] = useState(item?.par ?? 0);
+  const [max, setMax] = useState(item?.max ?? 0);
+  const [costPerUnit, setCostPerUnit] = useState(item?.costPerUnit ?? 0);
+  const [station, setStation] = useState(item?.station ?? stations[0] ?? "");
+  const [category, setCategory] = useState(item?.category ?? categories[0] ?? "");
+  const [vendor, setVendor] = useState(item?.vendor ?? "");
+
+  const valid = name.trim() !== "" && unit.trim() !== "" && station !== "" && category !== "";
+
+  function save() {
+    if (!valid) return;
+    onSave({
+      id: item?.id ?? crypto.randomUUID(),
+      usage: item?.usage ?? [0, 0, 0, 0, 0, 0, 0],
+      barcode: item?.barcode,
+      name: name.trim(), unit: unit.trim(), current, par, max, costPerUnit,
+      station, category, vendor: vendor.trim() || undefined,
+    });
+    onClose();
+  }
+
+  const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: ui.muted, marginBottom: 4, display: "block", letterSpacing: 0.2, textTransform: "uppercase" };
+  const half: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 };
+
+  return (
+    <Modal title={isEdit ? "Edit Item" : "Add Item"} onClose={onClose}>
+      <div style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 2 }}>
+        <div style={{ marginBottom: 12 }}>
+          <span style={lbl}>Name *</span>
+          <input autoFocus value={name} onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && valid) save(); if (e.key === "Escape") onClose(); }}
+            style={inputStyle} placeholder="e.g. Ground Beef 80/20" />
+        </div>
+        <div style={half}>
+          <div>
+            <span style={lbl}>Unit *</span>
+            <input value={unit} onChange={e => setUnit(e.target.value)} style={inputStyle} placeholder="lb, ea, oz…" />
+          </div>
+          <div>
+            <span style={lbl}>Cost / Unit ($)</span>
+            <input type="number" min="0" step="0.01" value={costPerUnit || ""} onChange={e => setCostPerUnit(parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0.00" />
+          </div>
+        </div>
+        <div style={half}>
+          <div>
+            <span style={lbl}>On Hand</span>
+            <input type="number" min="0" step="0.1" value={current || ""} onChange={e => setCurrent(parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0" />
+          </div>
+          <div>
+            <span style={lbl}>Par Level</span>
+            <input type="number" min="0" step="1" value={par || ""} onChange={e => setPar(parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0" />
+          </div>
+        </div>
+        <div style={half}>
+          <div>
+            <span style={lbl}>Max</span>
+            <input type="number" min="0" step="1" value={max || ""} onChange={e => setMax(parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0" />
+          </div>
+          <div>
+            <span style={lbl}>Vendor</span>
+            <input value={vendor} onChange={e => setVendor(e.target.value)} style={inputStyle} placeholder="Optional" />
+          </div>
+        </div>
+        <div style={half}>
+          <div>
+            <span style={lbl}>Category *</span>
+            <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>
+              {categories.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <span style={lbl}>Station *</span>
+            <select value={station} onChange={e => setStation(e.target.value)} style={inputStyle}>
+              {stations.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+        <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+        <Btn variant="primary" disabled={!valid} onClick={save}><Icon.check /> {isEdit ? "Save changes" : "Add Item"}</Btn>
+      </div>
+    </Modal>
+  );
+}
+
 function Inventory() {
   const { items, setItems, stations, categories } = useApp();
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [stn, setStn] = useState("all");
+  type IM = { mode: "add" } | { mode: "edit"; item: Item } | { mode: "delete"; item: Item };
+  const [modal, setModal] = useState<IM | null>(null);
   const filtered = items.filter(i => {
     if (q && !i.name.toLowerCase().includes(q.toLowerCase())) return false;
     if (cat !== "all" && i.category !== cat) return false;
@@ -1794,7 +1889,7 @@ function Inventory() {
 
   return (
     <div>
-      <PageHeader title="Full Inventory" subtitle={`${items.length} SKUs · live tracking`} actions={<><Btn>Export CSV</Btn><Btn variant="primary">+ Add Item</Btn></>}/>
+      <PageHeader title="Full Inventory" subtitle={`${items.length} SKUs · live tracking`} actions={<><Btn>Export CSV</Btn><Btn variant="primary" onClick={() => setModal({ mode: "add" })}><Icon.plus /> Add Item</Btn></>}/>
       <Card pad={0}>
         <div style={{ display: "flex", gap: 8, padding: isMobile ? 10 : 14, borderBottom: `1px solid ${ui.lineSoft}`, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 100%", minWidth: 0, position: "relative" }}>
@@ -1826,6 +1921,8 @@ function Inventory() {
                       <div style={{ width: `${pct}%`, height: "100%", background: barColor }}/>
                     </div>
                     <div style={{ ...ui.mono, fontSize: 11, color: ui.muted }}>${(it.current * it.costPerUnit).toFixed(0)}</div>
+                    <Btn size="sm" variant="ghost" onClick={() => setModal({ mode: "edit", item: it })}><Icon.pencil /></Btn>
+                    <Btn size="sm" variant="ghost" onClick={() => setModal({ mode: "delete", item: it })}><Icon.x /></Btn>
                   </div>
                 </div>
               );
@@ -1850,7 +1947,7 @@ function Inventory() {
                       <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.muted }}>{it.par}</td>
                       <td style={{ padding: "12px 16px", textAlign: "right", ...ui.mono, fontSize: 12, color: ui.ink2 }}>${(it.current * it.costPerUnit).toFixed(0)}</td>
                       <td style={{ padding: "12px 16px", textAlign: "right" }}><Spark data={it.usage} w={70} h={20}/></td>
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}><Btn size="sm" variant="ghost" onClick={() => setItems(prev => prev.filter(x => x.id !== it.id))}><Icon.x/></Btn></td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}><div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}><Btn size="sm" variant="ghost" onClick={() => setModal({ mode: "edit", item: it })}><Icon.pencil /></Btn><Btn size="sm" variant="ghost" onClick={() => setModal({ mode: "delete", item: it })}><Icon.x /></Btn></div></td>
                     </tr>
                   );
                 })}
@@ -1859,6 +1956,20 @@ function Inventory() {
           </div>
         )}
       </Card>
+      {modal?.mode === "add" && (
+        <ItemForm onSave={it => setItems(prev => [...prev, it])} onClose={() => setModal(null)} />
+      )}
+      {modal?.mode === "edit" && (
+        <ItemForm item={modal.item} onSave={updated => setItems(prev => prev.map(x => x.id === updated.id ? updated : x))} onClose={() => setModal(null)} />
+      )}
+      {modal?.mode === "delete" && (
+        <Modal title={`Delete "${modal.item.name}"?`} message="This will permanently remove the item from inventory." onClose={() => setModal(null)}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="secondary" onClick={() => setModal(null)}>Cancel</Btn>
+            <Btn variant="danger" onClick={() => { setItems(prev => prev.filter(x => x.id !== modal.item.id)); setModal(null); }}>Delete</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
