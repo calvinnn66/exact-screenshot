@@ -1,6 +1,6 @@
 # KitchenIntel — Session State Handoff
 
-_Updated: 2026-06-16 (P0 bug fixes) · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 (P1 XS pass + Square audit fix) · Branch: `clawbot-dev`_
 
 ---
 
@@ -14,11 +14,11 @@ _Updated: 2026-06-16 (P0 bug fixes) · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
+| `d39ca1d` | fix(square): move consecutiveErrors outside if(conn) block in getSquareStatus |
+| `df2c084` | fix(p1): deliveries coming soon, remove duplicate mapping, clean up settings |
 | `cf974f9` | fix(p0): sales persistence, simulator guard, usage tracking, consecutiveErrors scope |
 | `f2fa01f` | docs: update SESSION_STATE.md — P2-B complete, all P2 done |
 | `c2951fd` | feat(recipes): add editable recipe ingredient UI (P2-B) |
-| `b69902e` | feat(pos): per-location order filtering in POS panels (P2-D) |
-| `76139c9` | feat(pos): poll getToastStatus every 15 s to keep badge fresh (P2-C) |
 
 ---
 
@@ -118,6 +118,37 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 
 ---
 
+## Completed this session (2026-06-16)
+
+### P1 XS Pass ✓ (commit `df2c084`)
+
+#### P1-J — Deliveries Coming Soon
+- `Deliveries()` body replaced with a static Coming Soon card
+- Inert `+ New PO` button and fake vendor cards removed
+
+#### P1-K — Remove duplicate Menu Item Mapping table
+- Standalone `<Card title="Menu Item Mapping">` at bottom of `Integrations` removed
+- Per-panel mapping UIs inside `ToastPanel` / `SquarePanel` unchanged
+
+#### P1-H — Remove fake API key
+- `<Field label="API Key" value="ki_live_••••••••3f8a">` removed from Settings
+
+#### P1-I — Live webhook count
+- `squareWebhookCount` state added to `Shell`
+- `SquarePanel.onConnectionChange` expanded to `(connected: boolean, webhookCount: number)`
+- Shell callback sets both `squareConnected` + `squareWebhookCount` on every SquarePanel refresh
+- `Settings` accepts `webhookCount?: number`; derives from `(toastStatusData?.webhookCount ?? 0) + squareWebhookCount`
+- Zero state shows "No webhooks connected" pill
+
+### Square Audit Bug Fix ✓ (commit `d39ca1d`)
+
+#### Square `consecutiveErrors` scope
+- `let consecutiveErrors = 0` was declared inside `if (conn)` in `getSquareStatus` (`square.functions.ts:91`)
+- Referenced in the `return` statement outside that block → ReferenceError at runtime for any project without a Square connection
+- Fixed identically to P0-4 (Toast): moved declaration to function scope alongside `webhookCount` / `webhookErrors`
+
+---
+
 ## Supabase status
 
 | Item | Status |
@@ -142,7 +173,9 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 
 ---
 
-## Open P1 issues (from audit, not yet fixed)
+## Open P1 issues
+
+XS items resolved: P1-H ✓, P1-I ✓, P1-J ✓, P1-K ✓ (commit `df2c084`)
 
 | # | Issue | Effort |
 |---|---|---|
@@ -153,17 +186,31 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 | P1-E | Print Prep List (button is inert) | S |
 | P1-F | Send to Stations (button is inert) | S |
 | P1-G | Prep List checkbox state resets on tab switch | S |
-| P1-H | Settings API Key is fake (`ki_live_••••••••3f8a`) | XS |
-| P1-I | "4 webhooks active" badge in Settings is hardcoded | XS |
-| P1-J | Hide Deliveries nav tab or show "Coming Soon" overlay | XS |
-| P1-K | Remove duplicate Menu Item Mapping table from Integrations view | XS |
 
 ---
 
-## Post-P0 roadmap
+## Square integration status
+
+| Item | Status |
+|---|---|
+| OAuth flow (sandbox + production toggle) | Implemented |
+| Token exchange + refresh | Implemented |
+| Catalog sync (`GET /v2/catalog/list?types=ITEM`) | Implemented |
+| Order processing (`order.created` / `.updated` / `.fulfillment.updated`) | Implemented |
+| `consecutiveErrors` runtime bug | Fixed `d39ca1d` |
+| Modifier sync | Not implemented |
+| Refund sync | Not implemented |
+| Batch order backfill | Not implemented |
+| Sandbox credentials wired | **Pending** — app created, not yet in `.env` |
+| Production credentials wired | **Pending** — not yet in `.env` |
+| Webhook subscription registered | **Pending** |
+
+## Roadmap
 
 | Priority | Item | Scope |
 |---|---|---|
+| Next | **Wire Square sandbox credentials** — set env vars, test OAuth flow, verify webhook delivery | Config only |
 | P3-A | **PR to main** — review and merge `clawbot-dev` into `main` | Git only |
 | P3-B | **`pos_orders.project_id` UUID migration** — align project_id column type with `crypto.randomUUID()` format | Migration + backfill |
-| P3-C | **P1 polish pass** — work through P1-A … P1-K in priority order | UI only |
+| P3-C | **P1 S-pass** — P1-D/E/G/F (export CSV, print prep, persist checkboxes, send to stations) | UI only |
+| P3-D | **P1 M-pass** — P1-A/B/C (computed dashboard insights, forecast stats, reports) | Logic + UI |

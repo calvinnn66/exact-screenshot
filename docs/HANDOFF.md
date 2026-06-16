@@ -1,6 +1,6 @@
 # KitchenIntel — Developer Handoff
 
-_Updated: 2026-06-16 · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 (Square bug fix + P1 XS pass) · Branch: `clawbot-dev`_
 
 ---
 
@@ -18,10 +18,11 @@ Do not merge `clawbot-dev` → `main` without a review pass on the open P1 items
 ## Latest Commit
 
 ```
-cf974f9  fix(p0): sales persistence, simulator guard, usage tracking, consecutiveErrors scope
+d39ca1d  fix(square): move consecutiveErrors outside if(conn) block in getSquareStatus
+df2c084  fix(p1): deliveries coming soon, remove duplicate mapping, clean up settings
 ```
 
-All four P0 audit bugs are fixed. Working tree is clean. Branch is up to date with remote.
+All P0 bugs fixed. P1 XS pass complete. Square audit bug fixed. Branch is up to date with remote.
 
 ---
 
@@ -29,9 +30,10 @@ All four P0 audit bugs are fixed. Working tree is clean. Branch is up to date wi
 
 | File | Last change |
 |---|---|
-| `src/routes/index.tsx` | P0-1 sales persistence, P0-2 simulator guard, P0-3 usage tracking |
-| `src/components/SquarePanel.tsx` | P0-2 `onConnectionChange` prop wired |
+| `src/routes/index.tsx` | P0-1 sales persistence, P0-2 simulator guard, P0-3 usage tracking; P1-J/K/H/I |
+| `src/components/SquarePanel.tsx` | P0-2 `onConnectionChange` prop; P1-I webhookCount emitted |
 | `src/lib/toast.functions.ts` | P0-4 `consecutiveErrors` scope fixed |
+| `src/lib/square.functions.ts` | Square audit: `consecutiveErrors` scope fixed (same as P0-4) |
 
 ---
 
@@ -119,11 +121,22 @@ bun format
 - **P0-3**: Real POS feed tick now updates `item.usage[day]` in addition to `item.current`
 - **P0-4**: `consecutiveErrors` moved outside `if (conn)` in `getToastStatus` — always defined in return value
 
+### P1 XS Pass ✓ (commit `df2c084`)
+- **P1-J**: Deliveries body replaced with Coming Soon card; inert buttons removed
+- **P1-K**: Duplicate Menu Item Mapping table removed from Integrations view bottom
+- **P1-H**: Fake `ki_live_••••••••3f8a` API Key field removed from Settings
+- **P1-I**: Hardcoded "4 webhooks active" replaced with live count (Toast + Square); zero-state shows "No webhooks connected"
+
+### Square Audit Bug Fix ✓ (commit `d39ca1d`)
+- **Square P0-4**: `consecutiveErrors` was declared inside `if (conn)` in `getSquareStatus` — identical to the P0-4 pattern fixed in Toast. Moved to function scope. Without this fix, `getSquareStatus` threw a ReferenceError at runtime for any project with no Square connection.
+
 ---
 
 ## Open Issues
 
 ### P1 — High Priority (no blockers, bounded scope)
+
+XS items done: P1-H, P1-I, P1-J, P1-K (`df2c084`)
 
 | ID | Issue | File(s) | Effort |
 |---|---|---|---|
@@ -134,10 +147,6 @@ bun format
 | P1-E | Prep "Print" button is inert | `index.tsx` Prep component | S |
 | P1-F | "Send to Stations" button is inert | `index.tsx` Prep component | S |
 | P1-G | Prep List checkboxes reset on tab switch | `index.tsx` Prep component | S |
-| P1-H | Settings API Key is fake (`ki_live_••••••••3f8a`) | `index.tsx` Settings component | XS |
-| P1-I | "4 webhooks active" badge hardcoded | `index.tsx` Settings component | XS |
-| P1-J | Deliveries tab has no implementation — should show Coming Soon or be hidden | `index.tsx` nav + Deliveries component | XS |
-| P1-K | Duplicate Menu Item Mapping table at bottom of Integrations view | `index.tsx` Integrations component | XS |
 
 ### P2 — Data integrity
 
@@ -203,8 +212,11 @@ Migration files in `supabase/migrations/`.
 - **Status polling**: `getSquareStatus` every 15 s in `SquarePanel`
 - **Webhook**: `/api/public/square/webhook` — HMAC-verified, idempotent insert, order normalization
 - **Location filtering**: `location_id` self-derived from `status.connection.location_id`
-- **Consecutive errors**: surfaced in `SquarePanel` amber banner when `>= 3`
+- **Consecutive errors**: surfaced in `SquarePanel` amber banner when `>= 3`; **`consecutiveErrors` scope bug fixed** (`d39ca1d`)
 - **Simulator guard**: `SquarePanel` now reports connection status to Shell via `onConnectionChange` prop; simulator is suppressed when Square is live
+- **Sandbox app**: credentials exist (not yet wired); production app credentials also available
+- **Missing for sandbox OAuth**: `SQUARE_APPLICATION_ID` + `SQUARE_APPLICATION_SECRET` in `.env` + public URL
+- **Missing for sandbox webhooks**: `SQUARE_WEBHOOK_SIGNATURE_KEY` + registered subscription in Square dashboard
 
 ---
 
