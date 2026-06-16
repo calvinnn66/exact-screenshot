@@ -229,6 +229,11 @@ export function SquarePanel({ projectId, menuSkus }: Props) {
       )}
 
       <div style={css.body}>
+        {connected && (status?.consecutiveErrors ?? 0) >= 3 && (
+          <div style={{ padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 6 }}>
+            {status.consecutiveErrors} consecutive webhook failures — verify your webhook URL and signature key.
+          </div>
+        )}
         {!connected ? (
           <div>
             <div style={css.kv}>
@@ -247,6 +252,7 @@ export function SquarePanel({ projectId, menuSkus }: Props) {
             <div><div style={css.kvLabel}>Token refresh in</div><div style={css.kvValue}>{tokenExpiresIn} days</div></div>
             <div><div style={css.kvLabel}>Last webhook</div><div style={css.kvValue}>{timeAgo(status.lastEventAt)}</div></div>
             <div><div style={css.kvLabel}>Webhooks (24h)</div><div style={css.kvValue}>{status.webhookCount}{status.webhookErrors > 0 && <span style={{ color: "#DC2626", fontSize: 12 }}> · {status.webhookErrors} errors</span>}</div></div>
+            <div><div style={css.kvLabel}>Consecutive errors</div><div style={{ ...css.kvValue, color: (status.consecutiveErrors ?? 0) > 0 ? "#DC2626" : undefined }}>{(status.consecutiveErrors ?? 0) > 0 ? status.consecutiveErrors : "None"}</div></div>
             <div><div style={css.kvLabel}>Orders (24h)</div><div style={css.kvValue}>{status.orders24h}</div></div>
           </div>
         ) : tab === "mapping" ? (

@@ -98,6 +98,18 @@ export const getToastStatus = createServerFn({ method: "POST" })
         .maybeSingle();
       lastEventAt = last?.received_at || null;
 
+      const { data: recent } = await supabaseAdmin
+        .from("toast_webhook_events")
+        .select("error")
+        .eq("restaurant_guid", conn.restaurant_guid)
+        .order("received_at", { ascending: false })
+        .limit(20);
+      let consecutiveErrors = 0;
+      for (const ev of recent || []) {
+        if (ev.error != null) consecutiveErrors++;
+        else break;
+      }
+
       const { count: oc } = await supabaseAdmin
         .from("pos_orders")
         .select("id", { count: "exact", head: true })
@@ -111,6 +123,7 @@ export const getToastStatus = createServerFn({ method: "POST" })
       connection: conn,
       webhookCount,
       webhookErrors,
+      consecutiveErrors,
       lastEventAt,
       orders24h,
       webhookUrl: publicBaseUrl() + WEBHOOK_PATH,
