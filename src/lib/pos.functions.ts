@@ -15,6 +15,7 @@ export const getLivePosFeed = createServerFn({ method: "POST" })
       projectId: z.string().min(1),
       sinceIso: z.string().optional(),
       limit: z.number().int().min(1).max(200).default(50),
+      locationId: z.string().optional(),
     }).parse(i),
   )
   .handler(async ({ data }) => {
@@ -22,11 +23,15 @@ export const getLivePosFeed = createServerFn({ method: "POST" })
 
     const sinceIso = data.sinceIso || new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
-    const { data: rows, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("pos_orders")
       .select("id, source, external_id, items, total_cents, currency, ordered_at, location_id, merchant_id")
       .eq("project_id", data.projectId)
-      .gte("ordered_at", sinceIso)
+      .gte("ordered_at", sinceIso);
+
+    if (data.locationId) query = query.eq("location_id", data.locationId);
+
+    const { data: rows, error } = await query
       .order("ordered_at", { ascending: false })
       .limit(data.limit);
 
