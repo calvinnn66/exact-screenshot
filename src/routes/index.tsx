@@ -2247,14 +2247,15 @@ function Deliveries() {
 }
 
 function Integrations({ integrations, setIntegrations, posLive, setPosLive, toastStatusData }: any) {
-  const { menu, projectId } = useApp();
+  const { menu, projectId, locations, activeLocationId } = useApp();
   const menuSkus = menu.map((m: any) => ({ sku: m.id, name: m.name }));
+  const posLocationId = locations.find((l: any) => l.id === activeLocationId)?.posLocationId;
   return (
     <div>
       <PageHeader title="Integrations" subtitle="Connect POS, accounting, and supplier systems"/>
 
       <Grid cols="1fr 1fr" gap={16} style={{ marginBottom: 16 }}>
-        <ToastPanel projectId={projectId} menuSkus={menuSkus} />
+        <ToastPanel projectId={projectId} menuSkus={menuSkus} posLocationId={posLocationId} />
         <SquarePanel projectId={projectId} menuSkus={menuSkus} />
       </Grid>
 

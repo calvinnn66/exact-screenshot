@@ -13,6 +13,7 @@ import {
 type Props = {
   projectId: string;
   menuSkus: { sku: string; name: string }[];
+  posLocationId?: string;
 };
 
 const css = {
@@ -46,7 +47,7 @@ function timeAgo(iso: string | null) {
   return `${Math.round(s / 86400)}d ago`;
 }
 
-export function ToastPanel({ projectId, menuSkus }: Props) {
+export function ToastPanel({ projectId, menuSkus, posLocationId }: Props) {
   const statusFn = useServerFn(getToastStatus);
   const connectFn = useServerFn(connectToast);
   const disconnectFn = useServerFn(disconnectToast);
@@ -76,7 +77,7 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
     if (s?.connection) {
       const [m, o] = await Promise.all([
         mapListFn({ data: { projectId } }),
-        ordersFn({ data: { projectId, limit: 25 } }),
+        ordersFn({ data: { projectId, limit: 25, ...(posLocationId ? { locationId: posLocationId } : {}) } }),
       ]);
       setMapping(m.rows || []);
       setOrders(o.rows || []);
@@ -91,7 +92,7 @@ export function ToastPanel({ projectId, menuSkus }: Props) {
     const t = setInterval(refresh, 15_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, posLocationId]);
 
   const submitConnect = async (e: React.FormEvent) => {
     e.preventDefault();

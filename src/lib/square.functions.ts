@@ -230,13 +230,16 @@ export const listRecentOrders = createServerFn({ method: "POST" })
     z.object({
       projectId: z.string().min(1),
       limit: z.number().int().min(1).max(100).default(25),
+      locationId: z.string().optional(),
     }).parse(i)
   )
   .handler(async ({ data }) => {
-    const { data: rows, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("pos_orders")
       .select("id, external_id, items, total_cents, currency, ordered_at, location_id")
-      .eq("project_id", data.projectId)
+      .eq("project_id", data.projectId);
+    if (data.locationId) query = query.eq("location_id", data.locationId);
+    const { data: rows, error } = await query
       .order("ordered_at", { ascending: false })
       .limit(data.limit);
     if (error) return { ok: false as const, error: error.message, rows: [] };

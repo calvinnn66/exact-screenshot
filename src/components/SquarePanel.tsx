@@ -97,7 +97,7 @@ export function SquarePanel({ projectId, menuSkus }: Props) {
     if (s?.connection) {
       const [m, o] = await Promise.all([
         mapListFn({ data: { projectId } }),
-        ordersFn({ data: { projectId, limit: 25 } }),
+        ordersFn({ data: { projectId, limit: 25, ...(s.connection?.location_id ? { locationId: s.connection.location_id } : {}) } }),
       ]);
       setMapping(m.rows || []);
       setOrders(o.rows || []);
