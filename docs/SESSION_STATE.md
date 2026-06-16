@@ -1,6 +1,6 @@
 # KitchenIntel — Session State Handoff
 
-_Updated: 2026-06-15 · Branch: `clawbot-dev`_
+_Updated: 2026-06-16 · Branch: `clawbot-dev`_
 
 ---
 
@@ -14,11 +14,11 @@ _Updated: 2026-06-15 · Branch: `clawbot-dev`_
 
 | Hash | Description |
 |---|---|
+| `b69902e` | feat(pos): per-location order filtering in POS panels (P2-D) |
+| `76139c9` | feat(pos): poll getToastStatus every 15 s to keep badge fresh (P2-C) |
+| `a439c78` | feat(inventory): add full item CRUD modals (P2-A) |
 | `c5efd1a` | feat(ui): replace all window.prompt/confirm with proper modal dialogs |
-| `c2eedd4` | feat(pos): add optional locationId filter to getLivePosFeed (Phase 2) |
-| `0204c9a` | docs: record successful deployment of POS integration schema |
-| `8c29b84` | feat(db): add idx_pos_orders_location — Step 4 Phase 1 |
-| `d5c3535` | feat(toast): token-expired banner with reconnect prompt (Step 3D) |
+| `8a7d8df` | docs: update SESSION_STATE.md — P1 complete, post-P1 roadmap |
 
 ---
 
@@ -62,6 +62,27 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 
 ---
 
+## Completed P2 work
+
+### P2-A — Item CRUD modals ✓ (commit `a439c78`)
+- `ItemForm` component handles add and edit modes (name, unit, on hand, par, max, cost/unit, vendor, category, station)
+- Delete confirmation modal replaces the previous silent inline delete
+- Edit (pencil) and delete buttons wired in both desktop table rows and mobile cards
+- `+ Add Item` button in PageHeader opens the add form
+- `Icon.pencil` added to the icon set
+
+### P2-C — `getToastStatus` polling ✓ (commit `76139c9`)
+- `getToastStatus` useEffect in Shell converted from one-shot to 15 s interval (`setInterval`)
+- Badge, expiry state, and POS Sync Status card stay fresh without a page reload
+
+### P2-D — Per-location order filtering in POS panels ✓ (commit `b69902e`)
+- `listRecentToastOrders` and `listRecentOrders` both accept optional `locationId`; conditionally apply `.eq("location_id")` using the same `let query; if (locationId) query = query.eq(...)` pattern established in `pos.functions.ts`
+- `ToastPanel` accepts `posLocationId` prop and passes it to the orders query; interval restarts when locationId changes
+- `SquarePanel` self-derives `locationId` from `status.connection.location_id` — no new prop required
+- `Integrations` derives `posLocationId` from the active location and threads it to `ToastPanel`
+
+---
+
 ## Supabase status
 
 | Item | Status |
@@ -80,21 +101,15 @@ All `window.prompt` and `window.confirm` calls replaced with rendered modals:
 |---|---|
 | `pos_orders.project_id` is TEXT (old `prj_abc1234` format) | FK integrity not enforced; UUID migration needed for strict integrity |
 | No conflict resolution in write-through | Last write wins if two browser tabs open as same user |
-| `getToastStatus` fires once on mount only | Stale connection badge until page reload |
-| `listRecentToastOrders` / `getToastStatus.orders24h` | Still project-wide (no per-location filter) |
+| `getToastStatus.orders24h` | Still project-wide (not per-location filtered) |
 | `*.client.*` filenames blocked by TanStack Start SSR | New browser-only Supabase helpers must be named `*-db.ts` |
 
 ---
 
-## Post-P1 roadmap
-
-All P1 items are complete. Suggested next priorities:
+## Post-P2 roadmap
 
 | Priority | Item | Scope |
 |---|---|---|
-| P2-A | **Item CRUD modals** — inline edit/add item form (currently no way to add/edit individual inventory items in-app) | UI only, no schema change |
 | P2-B | **Recipe editor** — proper recipe ingredient UI (currently read-only in most views) | UI only |
-| P2-C | **`getToastStatus` polling** — move from one-shot to interval refresh (15 s) to keep badge fresh | 3-line change in Shell |
-| P2-D | **Per-location order filtering** for `listRecentToastOrders` / `listRecentOrders` in the POS panels | Functions + UI |
 | P3-A | **PR to main** — review and merge `clawbot-dev` into `main` | Git only |
 | P3-B | **`pos_orders.project_id` UUID migration** — align project_id column type with `crypto.randomUUID()` format | Migration + backfill |
